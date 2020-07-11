@@ -20,8 +20,6 @@ import { downgradeInjectable } from '@angular/upgrade/static';
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
-// import { ExplorationPlayerPageConstants } from
-//  'pages/exploration-player-page/exploration-player-page.constants';
 import { AppConstants } from
   'app.constants';
 import { ReadOnlyExplorationBackendApiService } from

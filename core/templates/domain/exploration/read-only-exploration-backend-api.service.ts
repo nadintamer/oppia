@@ -23,10 +23,12 @@ import { HttpClient } from '@angular/common/http';
 
 import cloneDeep from 'lodash/cloneDeep';
 
-// import { ExplorationPlayerPageConstants } from
-//  'pages/exploration-player-page/exploration-player-page.constants';
 import { AppConstants } from
   'app.constants';
+import { Exploration, ExplorationObjectFactory} from
+  'domain/exploration/ExplorationObjectFactory';
+import { IReadOnlyExplorationBackendDict, ReadOnlyExplorationResponseObjectFactory } from
+  'domain/exploration/ReadOnlyExplorationResponseObjectFactory';
 import { UrlInterpolationService } from
   'domain/utilities/url-interpolation.service';
 
@@ -35,6 +37,7 @@ import { UrlInterpolationService } from
 })
 export class ReadOnlyExplorationBackendApiService {
   constructor(
+    private explorationObjectFactory: ExplorationObjectFactory,
     private http: HttpClient,
     private urlInterpolation: UrlInterpolationService) {}
 
@@ -48,9 +51,11 @@ export class ReadOnlyExplorationBackendApiService {
       errorCallback: (reason?: string) => void): void {
     var explorationDataUrl = this._getExplorationUrl(explorationId, version);
 
-    this.http.get(explorationDataUrl).toPromise()
+    this.http.get<IReadOnlyExplorationBackendDict>(explorationDataUrl).toPromise()
       .then(response => {
         var exploration = cloneDeep(response);
+        var explorationObject = this.explorationObjectFactory.createFromBackendDict(exploration);
+        console.log(explorationObject);
         if (successCallback) {
           successCallback(exploration);
         }

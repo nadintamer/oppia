@@ -25,7 +25,7 @@ import { EditableExplorationBackendApiService } from
 import { ReadOnlyExplorationBackendApiService } from
   'domain/exploration/read-only-exploration-backend-api.service.ts';
 
-fdescribe('Editable exploration backend API service', () => {
+describe('Editable exploration backend API service', () => {
   let editableExplorationBackendApiService:
     EditableExplorationBackendApiService = null;
   let readOnlyExplorationBackendApiService:

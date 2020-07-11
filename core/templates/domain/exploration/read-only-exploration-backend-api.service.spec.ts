@@ -20,8 +20,14 @@ import { HttpClientTestingModule, HttpTestingController } from
   '@angular/common/http/testing';
 import { TestBed, fakeAsync, flushMicrotasks } from '@angular/core/testing';
 
+import { CamelCaseToHyphensPipe } from
+  'filters/string-utility-filters/camel-case-to-hyphens.pipe';
+import { ExplorationObjectFactory} from
+  'domain/exploration/ExplorationObjectFactory';
 import { ReadOnlyExplorationBackendApiService } from
   'domain/exploration/read-only-exploration-backend-api.service.ts';
+import { ReadOnlyExplorationResponseObjectFactory } from
+  'domain/exploration/ReadOnlyExplorationResponseObjectFactory';
 import { SubtitledHtmlObjectFactory } from
   'domain/exploration/SubtitledHtmlObjectFactory';
 
@@ -29,6 +35,7 @@ fdescribe('Read only exploration backend API service', () => {
   let readOnlyExplorationBackendApiService:
     ReadOnlyExplorationBackendApiService = null;
   let subtitledHtmlObjectFactory: SubtitledHtmlObjectFactory = null;
+  let readOnlyExplorationResponseObjectFactory: ReadOnlyExplorationResponseObjectFactory = null;
   let httpTestingController: HttpTestingController;
   let sampleDataResults = {
     exploration_id: '0',
@@ -67,6 +74,7 @@ fdescribe('Read only exploration backend API service', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
+      providers: [CamelCaseToHyphensPipe],
       imports: [HttpClientTestingModule]
     });
 
@@ -75,6 +83,8 @@ fdescribe('Read only exploration backend API service', () => {
     readOnlyExplorationBackendApiService = TestBed.get(
       ReadOnlyExplorationBackendApiService);
     httpTestingController = TestBed.get(HttpTestingController);
+    explorationObjectFactory = TestBed.get(ExplorationObjectFactory);
+    readOnlyExplorationResponseObjectFactory = TestBed.get(ReadOnlyExplorationResponseObjectFactory);
   });
 
   afterEach(() => {
