@@ -16,6 +16,9 @@
  * @fileoverview Utility service for the learner's view of an exploration.
  */
 
+import { OppiaAngularRootComponent } from
+  'components/oppia-angular-root.component';
+
 require('domain/collection/guest-collection-progress.service.ts');
 require('domain/exploration/editable-exploration-backend-api.service.ts');
 require('domain/exploration/ExplorationObjectFactory.ts');
@@ -70,6 +73,8 @@ angular.module('oppia').factory('ExplorationEngineService', [
       FocusManagerService, ImagePreloaderService, LearnerParamsService,
       PlayerTranscriptService, ReadOnlyExplorationBackendApiService,
       StateCardObjectFactory, StatsReportingService, UrlService) {
+    StatsReportingService = (
+      OppiaAngularRootComponent.statsReportingService);
     var _explorationId = ContextService.getExplorationId();
     var _editorPreviewMode = ContextService.isInExplorationEditorPage();
     var _questionPlayerMode = ContextService.isInQuestionPlayerMode();
@@ -248,7 +253,7 @@ angular.module('oppia').factory('ExplorationEngineService', [
           manualParamChanges = manualParamChangesToInit;
           initStateName = activeStateNameFromPreviewTab;
         } else {
-          throw 'Error: cannot populate exploration in learner mode.';
+          throw new Error('Cannot populate exploration in learner mode.');
         }
       },
       /**
@@ -351,7 +356,7 @@ angular.module('oppia').factory('ExplorationEngineService', [
 
         // Use angular.copy() to clone the object
         // since classificationResult.outcome points
-        // at oldState.interaction.default_outcome
+        // at oldState.interaction.default_outcome.
         var outcome = angular.copy(classificationResult.outcome);
         var newStateName = outcome.dest;
 

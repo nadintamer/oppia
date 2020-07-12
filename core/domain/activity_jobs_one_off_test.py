@@ -20,11 +20,14 @@ from __future__ import absolute_import  # pylint: disable=import-only-modules
 from __future__ import unicode_literals  # pylint: disable=import-only-modules
 
 import ast
+import datetime
 
+from constants import constants
 from core.domain import activity_jobs_one_off
 from core.domain import collection_domain
 from core.domain import collection_services
 from core.domain import exp_domain
+from core.domain import exp_fetchers
 from core.domain import exp_services
 from core.domain import rights_manager
 from core.domain import search_services
@@ -35,10 +38,211 @@ from core.tests import test_utils
 import feconf
 import python_utils
 
+from google.appengine.ext import ndb
+
 gae_search_services = models.Registry.import_search_services()
 
 (collection_models, exp_models) = models.Registry.import_models(
     [models.NAMES.collection, models.NAMES.exploration])
+
+
+class ActivityContributorsSummaryOneOffJobTests(test_utils.GenericTestBase):
+    ONE_OFF_JOB_MANAGERS_FOR_TESTS = [
+        activity_jobs_one_off.ActivityContributorsSummaryOneOffJob]
+
+    EXP_ID = 'exp_id'
+    COL_ID = 'col_id'
+
+    USERNAME_A = 'usernamea'
+    USERNAME_B = 'usernameb'
+    EMAIL_A = 'emaila@example.com'
+    EMAIL_B = 'emailb@example.com'
+
+    def setUp(self):
+        super(ActivityContributorsSummaryOneOffJobTests, self).setUp()
+        self.signup(self.EMAIL_A, self.USERNAME_A)
+        self.signup(self.EMAIL_B, self.USERNAME_B)
+
+        self.user_a_id = self.get_user_id_from_email(self.EMAIL_A)
+        self.user_b_id = self.get_user_id_from_email(self.EMAIL_B)
+
+    def _run_one_off_job(self):
+        """Runs the one-off MapReduce job."""
+        job_id = (
+            activity_jobs_one_off.ActivityContributorsSummaryOneOffJob
+            .create_new())
+        activity_jobs_one_off.ActivityContributorsSummaryOneOffJob.enqueue(
+            job_id)
+        self.assertEqual(
+            self.count_jobs_in_taskqueue(
+                taskqueue_services.QUEUE_NAME_ONE_OFF_JOBS), 1)
+        self.process_and_flush_pending_tasks()
+        stringified_output = (
+            activity_jobs_one_off.ActivityContributorsSummaryOneOffJob
+            .get_output(job_id))
+        eval_output = [ast.literal_eval(stringified_item) for
+                       stringified_item in stringified_output]
+        return eval_output
+
+    def test_contributors_for_valid_nonrevert_contribution(self):
+        # Let USER A make three commits.
+        exploration = self.save_new_valid_exploration(
+            self.EXP_ID, self.user_a_id)
+        collection = self.save_new_valid_collection(self.COL_ID, self.user_a_id)
+
+        exp_services.update_exploration(
+            self.user_a_id, self.EXP_ID, [exp_domain.ExplorationChange({
+                'cmd': 'edit_exploration_property',
+                'property_name': 'title',
+                'new_value': 'New Exploration Title'
+            })], 'Changed title.')
+        exp_services.update_exploration(
+            self.user_a_id, self.EXP_ID, [exp_domain.ExplorationChange({
+                'cmd': 'edit_exploration_property',
+                'property_name': 'objective',
+                'new_value': 'New Objective'
+            })], 'Changed Objective.')
+        collection_services.update_collection(
+            self.user_a_id, self.COL_ID, [{
+                'cmd': 'edit_collection_property',
+                'property_name': 'title',
+                'new_value': 'New Exploration Title'
+            }], 'Changed title.')
+        collection_services.update_collection(
+            self.user_a_id, self.COL_ID, [{
+                'cmd': 'edit_collection_property',
+                'property_name': 'objective',
+                'new_value': 'New Objective'
+            }], 'Changed Objective.')
+
+        output = self._run_one_off_job()
+        self.assertEqual([['SUCCESS', 3]], output)
+
+        exploration_summary = exp_fetchers.get_exploration_summary_by_id(
+            exploration.id)
+        self.assertEqual([self.user_a_id], exploration_summary.contributor_ids)
+        self.assertEqual(
+            {self.user_a_id: 3}, exploration_summary.contributors_summary)
+
+        collection_summary = collection_services.get_collection_summary_by_id(
+            collection.id)
+        self.assertEqual([self.user_a_id], collection_summary.contributor_ids)
+        self.assertEqual(
+            {self.user_a_id: 3}, collection_summary.contributors_summary)
+
+    def test_contributors_with_only_reverts_not_included(self):
+        # Let USER A make three commits.
+        exploration = self.save_new_valid_exploration(
+            self.EXP_ID, self.user_a_id, title='Exploration Title 1')
+
+        exp_services.update_exploration(
+            self.user_a_id, self.EXP_ID, [exp_domain.ExplorationChange({
+                'cmd': 'edit_exploration_property',
+                'property_name': 'title',
+                'new_value': 'New Exploration Title'
+            })], 'Changed title.')
+        exp_services.update_exploration(
+            self.user_a_id, self.EXP_ID, [exp_domain.ExplorationChange({
+                'cmd': 'edit_exploration_property',
+                'property_name': 'objective',
+                'new_value': 'New Objective'
+            })], 'Changed Objective.')
+
+        # Let the second user revert version 3 to version 2.
+        exp_services.revert_exploration(self.user_b_id, self.EXP_ID, 3, 2)
+
+        output = self._run_one_off_job()
+        self.assertEqual([['SUCCESS', 1]], output)
+
+        exploration_summary = exp_fetchers.get_exploration_summary_by_id(
+            exploration.id)
+        self.assertEqual([self.user_a_id], exploration_summary.contributor_ids)
+        self.assertEqual(
+            {self.user_a_id: 2}, exploration_summary.contributors_summary)
+
+    def test_reverts_not_counted(self):
+        # Let USER A make 3 non-revert commits.
+        exploration = self.save_new_valid_exploration(
+            self.EXP_ID, self.user_a_id, title='Exploration Title')
+        exp_services.update_exploration(
+            self.user_a_id, self.EXP_ID, [exp_domain.ExplorationChange({
+                'cmd': 'edit_exploration_property',
+                'property_name': 'title',
+                'new_value': 'New Exploration Title'
+            })], 'Changed title.')
+        exp_services.update_exploration(
+            self.user_a_id, self.EXP_ID, [exp_domain.ExplorationChange({
+                'cmd': 'edit_exploration_property',
+                'property_name': 'objective',
+                'new_value': 'New Objective'
+            })], 'Changed Objective.')
+
+        # Let USER A revert version 3 to version 2.
+        exp_services.revert_exploration(self.user_a_id, self.EXP_ID, 3, 2)
+
+        output = self._run_one_off_job()
+        self.assertEqual([['SUCCESS', 1]], output)
+
+        # Check that USER A's number of contributions is equal to 2.
+        exploration_summary = exp_fetchers.get_exploration_summary_by_id(
+            exploration.id)
+        self.assertEqual([self.user_a_id], exploration_summary.contributor_ids)
+        self.assertEqual(
+            {self.user_a_id: 2}, exploration_summary.contributors_summary)
+
+    def test_nonhuman_committers_not_counted(self):
+        # Create a commit with the system user id.
+        exploration = self.save_new_valid_exploration(
+            self.EXP_ID, feconf.SYSTEM_COMMITTER_ID, title='Original Title')
+        collection = self.save_new_valid_collection(self.COL_ID, self.user_a_id)
+
+        # Create commits with all the system user ids.
+        for system_id in constants.SYSTEM_USER_IDS:
+            exp_services.update_exploration(
+                system_id, self.EXP_ID, [exp_domain.ExplorationChange({
+                    'cmd': 'edit_exploration_property',
+                    'property_name': 'title',
+                    'new_value': 'Title changed by %s' % system_id
+                })], 'Changed title.')
+            collection_services.update_collection(
+                system_id, self.COL_ID, [{
+                    'cmd': 'edit_collection_property',
+                    'property_name': 'title',
+                    'new_value': 'New Exploration Title'
+                }], 'Changed title.')
+
+        output = self._run_one_off_job()
+        self.assertEqual([['SUCCESS', 3]], output)
+
+        # Check that no system id was added to the exploration's
+        # contributor's summary.
+        exploration_summary = exp_fetchers.get_exploration_summary_by_id(
+            exploration.id)
+        collection_summary = collection_services.get_collection_summary_by_id(
+            collection.id)
+        for system_id in constants.SYSTEM_USER_IDS:
+            self.assertNotIn(
+                system_id,
+                exploration_summary.contributors_summary)
+            self.assertNotIn(
+                system_id,
+                exploration_summary.contributor_ids)
+            self.assertNotIn(
+                system_id,
+                collection_summary.contributors_summary)
+            self.assertNotIn(
+                system_id,
+                collection_summary.contributor_ids)
+
+    def test_deleted_exploration(self):
+        self.save_new_valid_exploration(
+            self.EXP_ID, self.user_a_id)
+        exp_services.delete_exploration(feconf.SYSTEM_COMMITTER_ID, self.EXP_ID)
+
+        self.process_and_flush_pending_tasks()
+
+        output = self._run_one_off_job()
+        self.assertEqual([], output)
 
 
 class AuditContributorsOneOffJobTests(test_utils.GenericTestBase):
@@ -322,161 +526,359 @@ class OneOffReindexActivitiesJobTests(test_utils.GenericTestBase):
                 'key', 'value'))
 
 
-class ReplaceAdminIdOneOffJobTests(test_utils.GenericTestBase):
+class MockCollectionCommitLogEntryModel(
+        collection_models.CollectionCommitLogEntryModel):
+    """Mock CollectionCommitLogEntryModel so that it allows to set username."""
+
+    username = ndb.StringProperty(indexed=True, required=False)
+
+
+class RemoveCommitUsernamesOneOffJobTests(test_utils.GenericTestBase):
 
     USER_1_ID = 'user_1_id'
 
     def _run_one_off_job(self):
         """Runs the one-off MapReduce job."""
-        job_id = activity_jobs_one_off.ReplaceAdminIdOneOffJob.create_new()
-        activity_jobs_one_off.ReplaceAdminIdOneOffJob.enqueue(job_id)
+        job_id = (
+            activity_jobs_one_off.RemoveCommitUsernamesOneOffJob.create_new())
+        activity_jobs_one_off.RemoveCommitUsernamesOneOffJob.enqueue(job_id)
         self.assertEqual(
             self.count_jobs_in_taskqueue(
                 taskqueue_services.QUEUE_NAME_ONE_OFF_JOBS), 1)
         self.process_and_flush_pending_tasks()
         stringified_output = (
-            activity_jobs_one_off.ReplaceAdminIdOneOffJob.get_output(job_id))
+            activity_jobs_one_off.RemoveCommitUsernamesOneOffJob
+            .get_output(job_id))
         eval_output = [ast.literal_eval(stringified_item) for
                        stringified_item in stringified_output]
         return eval_output
 
-    def test_one_snapshot_model_wrong(self):
-        exp_models.ExplorationRightsSnapshotMetadataModel(
-            id='exp_1_id',
-            committer_id='Admin',
-            commit_type='create',
-            commit_message='commit message 2',
-            commit_cmds=[{'cmd': 'some_command'}]).put()
+    def test_one_commit_model_with_username(self):
+        with self.swap(
+            collection_models, 'CollectionCommitLogEntryModel',
+            MockCollectionCommitLogEntryModel
+        ):
+            original_commit_model = (
+                collection_models.CollectionCommitLogEntryModel(
+                    id='id',
+                    user_id='committer_id',
+                    username='username',
+                    collection_id='col_id',
+                    commit_type='create',
+                    commit_message='Message',
+                    commit_cmds=[],
+                    version=1,
+                    post_commit_status='public',
+                    post_commit_community_owned=False,
+                    post_commit_is_private=False
+                )
+            )
+            original_commit_model.put()
+
+            # pylint: disable=protected-access
+            self.assertIsNotNone(original_commit_model.username)
+            self.assertIn('username', original_commit_model._values)
+            self.assertIn('username', original_commit_model._properties)
+
+            output = self._run_one_off_job()
+            self.assertItemsEqual(
+                [['SUCCESS_REMOVED - MockCollectionCommitLogEntryModel', 1]],
+                output)
+
+            migrated_commit_model = (
+                collection_models.CollectionCommitLogEntryModel.get_by_id('id'))
+            self.assertIsNone(migrated_commit_model.username)
+            self.assertNotIn('username', migrated_commit_model._values)
+            self.assertNotIn('username', migrated_commit_model._properties)
+            self.assertEqual(
+                original_commit_model.last_updated,
+                migrated_commit_model.last_updated)
+            # pylint: enable=protected-access
+
+    def test_one_commit_model_without_username(self):
+        original_commit_model = (
+            collection_models.CollectionCommitLogEntryModel(
+                id='id',
+                user_id='committer_id',
+                collection_id='col_id',
+                commit_type='create',
+                commit_message='Message',
+                commit_cmds=[],
+                version=1,
+                post_commit_status='public',
+                post_commit_community_owned=False,
+                post_commit_is_private=False
+            )
+        )
+        original_commit_model.put()
+
+        # pylint: disable=protected-access
+        self.assertNotIn('username', original_commit_model._values)
+        self.assertNotIn('username', original_commit_model._properties)
 
         output = self._run_one_off_job()
-        self.assertIn(['SUCCESS-RENAMED-SNAPSHOT', ['exp_1_id']], output)
+        self.assertItemsEqual(
+            [['SUCCESS_ALREADY_REMOVED - CollectionCommitLogEntryModel', 1]],
+            output)
 
-        migrated_model = (
-            exp_models.ExplorationRightsSnapshotMetadataModel.get_by_id(
-                'exp_1_id'))
+        migrated_commit_model = (
+            collection_models.CollectionCommitLogEntryModel.get_by_id('id'))
+        self.assertNotIn('username', migrated_commit_model._values)
+        self.assertNotIn('username', migrated_commit_model._properties)
         self.assertEqual(
-            migrated_model.committer_id, feconf.SYSTEM_COMMITTER_ID)
+            original_commit_model.last_updated,
+            migrated_commit_model.last_updated)
 
-    def test_one_snapshot_model_correct(self):
-        exp_models.ExplorationRightsSnapshotMetadataModel(
-            id='exp_1_id',
-            committer_id=self.USER_1_ID,
-            commit_type='create',
-            commit_message='commit message 2',
-            commit_cmds=[{'cmd': 'some_command'}]).put()
 
-        output = self._run_one_off_job()
-        self.assertIn(['SUCCESS-KEPT-SNAPSHOT', 1], output)
+class FixCommitLastUpdatedOneOffJobTests(test_utils.GenericTestBase):
 
-        migrated_model = (
-            exp_models.ExplorationRightsSnapshotMetadataModel.get_by_id(
-                'exp_1_id'))
-        self.assertEqual(migrated_model.committer_id, self.USER_1_ID)
+    USER_1_ID = 'user_1_id'
 
-    def test_one_commit_model_wrong(self):
-        exp_models.ExplorationCommitLogEntryModel(
-            id='exp_1_id-1',
-            exploration_id='exp_1_id',
-            user_id='Admin',
-            username='Admin',
-            commit_type='create',
-            commit_message='commit message 2',
-            commit_cmds=[{'cmd': 'some_command'}],
-            post_commit_status='public').put()
-
-        output = self._run_one_off_job()
-        self.assertIn(['SUCCESS-RENAMED-COMMIT', ['exp_1_id-1']], output)
-
-        migrated_model = (
-            exp_models.ExplorationCommitLogEntryModel.get_by_id('exp_1_id-1'))
-        self.assertEqual(migrated_model.user_id, feconf.SYSTEM_COMMITTER_ID)
-
-    def test_one_commit_model_correct(self):
-        exp_models.ExplorationCommitLogEntryModel(
-            id='exp_1_id-1',
-            exploration_id='exp_1_id',
-            user_id=self.USER_1_ID,
-            username='user',
-            commit_type='create',
-            commit_message='commit message 2',
-            commit_cmds=[{'cmd': 'some_command'}],
-            post_commit_status='public').put()
-
-        output = self._run_one_off_job()
-        self.assertIn(['SUCCESS-KEPT-COMMIT', 1], output)
-
-        migrated_model = (
-            exp_models.ExplorationCommitLogEntryModel.get_by_id('exp_1_id-1'))
-        self.assertEqual(migrated_model.user_id, self.USER_1_ID)
-
-    def test_multiple(self):
-        exp_models.ExplorationRightsSnapshotMetadataModel(
-            id='exp_1_id-1',
-            committer_id='Admin',
-            commit_type='create',
-            commit_message='commit message 2',
-            commit_cmds=[{'cmd': 'some_command'}]).put()
-        exp_models.ExplorationRightsSnapshotMetadataModel(
-            id='exp_1_id-2',
-            committer_id=self.USER_1_ID,
-            commit_type='create',
-            commit_message='commit message 2',
-            commit_cmds=[{'cmd': 'some_command'}]).put()
-        exp_models.ExplorationCommitLogEntryModel(
-            id='exp_1_id-1',
-            exploration_id='exp_1_id',
-            user_id='Admin',
-            username='Admin',
-            commit_type='create',
-            commit_message='commit message 2',
-            commit_cmds=[{'cmd': 'some_command'}],
-            post_commit_status='public').put()
-        exp_models.ExplorationCommitLogEntryModel(
-            id='exp_1_id-2',
-            exploration_id='exp_1_id',
-            user_id='Admin',
-            username='Admin',
-            commit_type='create',
-            commit_message='commit message 2',
-            commit_cmds=[{'cmd': 'some_command'}],
-            post_commit_status='public').put()
-        exp_models.ExplorationCommitLogEntryModel(
-            id='exp_1_id-3',
-            exploration_id='exp_1_id',
-            user_id=self.USER_1_ID,
-            username='user',
-            commit_type='create',
-            commit_message='commit message 2',
-            commit_cmds=[{'cmd': 'some_command'}],
-            post_commit_status='public').put()
-
-        output = self._run_one_off_job()
-        self.assertIn(
-            ['SUCCESS-RENAMED-SNAPSHOT', ['exp_1_id-1']], output)
-        self.assertIn(['SUCCESS-KEPT-SNAPSHOT', 1], output)
-        self.assertIn(
-            ['SUCCESS-RENAMED-COMMIT', ['exp_1_id-1', 'exp_1_id-2']], output)
-        self.assertIn(['SUCCESS-KEPT-COMMIT', 1], output)
-
-        migrated_model = (
-            exp_models.ExplorationRightsSnapshotMetadataModel.get_by_id(
-                'exp_1_id-1'))
+    def _run_one_off_job(self):
+        """Runs the one-off MapReduce job."""
+        job_id = (
+            activity_jobs_one_off.FixCommitLastUpdatedOneOffJob.create_new())
+        activity_jobs_one_off.FixCommitLastUpdatedOneOffJob.enqueue(job_id)
         self.assertEqual(
-            migrated_model.committer_id, feconf.SYSTEM_COMMITTER_ID)
-        migrated_model = (
-            exp_models.ExplorationRightsSnapshotMetadataModel.get_by_id(
-                'exp_1_id-2'))
-        self.assertEqual(migrated_model.committer_id, self.USER_1_ID)
+            self.count_jobs_in_taskqueue(
+                taskqueue_services.QUEUE_NAME_ONE_OFF_JOBS), 1)
+        self.process_and_flush_pending_tasks()
+        stringified_output = (
+            activity_jobs_one_off.FixCommitLastUpdatedOneOffJob
+            .get_output(job_id))
+        eval_output = [ast.literal_eval(stringified_item) for
+                       stringified_item in stringified_output]
+        return eval_output
 
-        migrated_model = (
-            exp_models.ExplorationCommitLogEntryModel.get_by_id(
-                'exp_1_id-1'))
-        self.assertEqual(migrated_model.user_id, feconf.SYSTEM_COMMITTER_ID)
-        migrated_model = (
-            exp_models.ExplorationCommitLogEntryModel.get_by_id(
-                'exp_1_id-2'))
-        self.assertEqual(migrated_model.user_id, feconf.SYSTEM_COMMITTER_ID)
-        migrated_model = (
-            exp_models.ExplorationCommitLogEntryModel.get_by_id(
-                'exp_1_id-3'))
-        self.assertEqual(migrated_model.user_id, self.USER_1_ID)
+    def test_one_commit_model_last_updated_before(self):
+        original_commit_model = (
+            collection_models.CollectionCommitLogEntryModel(
+                id='id',
+                user_id='committer_id',
+                collection_id='col_id',
+                commit_type='create',
+                commit_message='Message',
+                commit_cmds=[],
+                version=1,
+                post_commit_status='public',
+                post_commit_community_owned=False,
+                post_commit_is_private=False,
+                created_on=datetime.datetime.strptime(
+                    '2020-06-18T22:00:00Z', '%Y-%m-%dT%H:%M:%SZ'),
+                last_updated=datetime.datetime.strptime(
+                    '2020-06-18T22:01:00Z', '%Y-%m-%dT%H:%M:%SZ')
+            )
+        )
+        original_commit_model.put(update_last_updated_time=False)
+
+        output = self._run_one_off_job()
+        self.assertItemsEqual(
+            [['SUCCESS_NEWLY_CREATED - CollectionCommitLogEntryModel', 1]],
+            output)
+
+        migrated_commit_model = (
+            collection_models.CollectionCommitLogEntryModel.get_by_id('id'))
+        self.assertEqual(
+            original_commit_model.created_on,
+            migrated_commit_model.created_on)
+        self.assertEqual(
+            original_commit_model.last_updated,
+            migrated_commit_model.last_updated)
+
+    def test_one_commit_model_last_updated_during(self):
+        original_commit_model = (
+            collection_models.CollectionCommitLogEntryModel(
+                id='id',
+                user_id='committer_id',
+                collection_id='col_id',
+                commit_type='create',
+                commit_message='Message',
+                commit_cmds=[],
+                version=1,
+                post_commit_status='public',
+                post_commit_community_owned=False,
+                post_commit_is_private=False,
+                created_on=datetime.datetime.strptime(
+                    '2019-06-29T01:00:00Z', '%Y-%m-%dT%H:%M:%SZ'),
+                last_updated=datetime.datetime.strptime(
+                    '2020-06-29T11:00:00Z', '%Y-%m-%dT%H:%M:%SZ')
+            )
+        )
+        original_commit_model.put(update_last_updated_time=False)
+
+        output = self._run_one_off_job()
+        self.assertItemsEqual(
+            [['SUCCESS_FIXED - CollectionCommitLogEntryModel', 1]], output)
+
+        migrated_commit_model = (
+            collection_models.CollectionCommitLogEntryModel.get_by_id('id'))
+        self.assertEqual(
+            original_commit_model.created_on,
+            migrated_commit_model.created_on)
+        self.assertNotEqual(
+            original_commit_model.last_updated,
+            migrated_commit_model.last_updated)
+        self.assertEqual(
+            original_commit_model.created_on,
+            migrated_commit_model.last_updated)
+
+    def test_one_commit_model_last_updated_after(self):
+        original_commit_model = (
+            collection_models.CollectionCommitLogEntryModel(
+                id='id',
+                user_id='committer_id',
+                collection_id='col_id',
+                commit_type='create',
+                commit_message='Message',
+                commit_cmds=[],
+                version=1,
+                post_commit_status='public',
+                post_commit_community_owned=False,
+                post_commit_is_private=False,
+                created_on=datetime.datetime.strptime(
+                    '2020-07-01T08:59:59Z', '%Y-%m-%dT%H:%M:%SZ'),
+                last_updated=datetime.datetime.strptime(
+                    '2020-07-01T09:00:00Z', '%Y-%m-%dT%H:%M:%SZ')
+            )
+        )
+        original_commit_model.put(update_last_updated_time=False)
+
+        output = self._run_one_off_job()
+        self.assertItemsEqual(
+            [['SUCCESS_NEWLY_CREATED - CollectionCommitLogEntryModel', 1]],
+            output)
+
+        migrated_commit_model = (
+            collection_models.CollectionCommitLogEntryModel.get_by_id('id'))
+        self.assertEqual(
+            original_commit_model.created_on,
+            migrated_commit_model.created_on)
+        self.assertEqual(
+            original_commit_model.last_updated,
+            migrated_commit_model.last_updated)
+
+    def test_multiple_commit_models_admins(self):
+        original_commit_model_1 = (
+            collection_models.CollectionCommitLogEntryModel(
+                id='id1',
+                user_id=feconf.SYSTEM_COMMITTER_ID,
+                collection_id='col_id',
+                commit_type='create',
+                commit_message='Message',
+                commit_cmds=[],
+                version=1,
+                post_commit_status='public',
+                post_commit_community_owned=False,
+                post_commit_is_private=False,
+                created_on=datetime.datetime.strptime(
+                    '2020-07-01T09:59:59Z', '%Y-%m-%dT%H:%M:%SZ'),
+                last_updated=datetime.datetime.strptime(
+                    '2020-07-01T11:00:00Z', '%Y-%m-%dT%H:%M:%SZ')
+            )
+        )
+        original_commit_model_1.put(update_last_updated_time=False)
+        original_commit_model_2 = (
+            collection_models.CollectionCommitLogEntryModel(
+                id='id2',
+                user_id=feconf.MIGRATION_BOT_USER_ID,
+                collection_id='col_id',
+                commit_type='create',
+                commit_message='Message',
+                commit_cmds=[],
+                version=1,
+                post_commit_status='public',
+                post_commit_community_owned=False,
+                post_commit_is_private=False,
+                created_on=datetime.datetime.strptime(
+                    '2020-07-01T09:59:59Z', '%Y-%m-%dT%H:%M:%SZ'),
+                last_updated=datetime.datetime.strptime(
+                    '2020-07-01T11:00:00Z', '%Y-%m-%dT%H:%M:%SZ')
+            )
+        )
+        original_commit_model_2.put(update_last_updated_time=False)
+
+        output = self._run_one_off_job()
+        self.assertItemsEqual(
+            [['SUCCESS_ADMIN - CollectionCommitLogEntryModel', 2]], output)
+
+        migrated_commit_model_1 = (
+            collection_models.CollectionCommitLogEntryModel.get_by_id('id1'))
+        self.assertEqual(
+            original_commit_model_1.created_on,
+            migrated_commit_model_1.created_on)
+        self.assertEqual(
+            original_commit_model_1.last_updated,
+            migrated_commit_model_1.last_updated)
+
+        migrated_commit_model_2 = (
+            collection_models.CollectionCommitLogEntryModel.get_by_id('id2'))
+        self.assertEqual(
+            original_commit_model_2.created_on,
+            migrated_commit_model_2.created_on)
+        self.assertEqual(
+            original_commit_model_2.last_updated,
+            migrated_commit_model_2.last_updated)
+
+    def test_multiple_commit_models_last_updated_wrong(self):
+        original_commit_model_1 = (
+            collection_models.CollectionCommitLogEntryModel(
+                id='id1',
+                user_id='committer_id',
+                collection_id='col_id',
+                commit_type='create',
+                commit_message='Message',
+                commit_cmds=[],
+                version=1,
+                post_commit_status='public',
+                post_commit_community_owned=False,
+                post_commit_is_private=False,
+                created_on=datetime.datetime.strptime(
+                    '2020-07-01T09:59:59Z', '%Y-%m-%dT%H:%M:%SZ'),
+                last_updated=datetime.datetime.strptime(
+                    '2020-07-01T09:00:00Z', '%Y-%m-%dT%H:%M:%SZ')
+            )
+        )
+        original_commit_model_1.put(update_last_updated_time=False)
+        original_commit_model_2 = (
+            collection_models.CollectionCommitLogEntryModel(
+                id='id2',
+                user_id='committer_id',
+                collection_id='col_id',
+                commit_type='create',
+                commit_message='Message',
+                commit_cmds=[],
+                version=1,
+                post_commit_status='public',
+                post_commit_community_owned=False,
+                post_commit_is_private=False,
+                created_on=datetime.datetime.strptime(
+                    '2020-07-01T09:59:59Z', '%Y-%m-%dT%H:%M:%SZ'),
+                last_updated=datetime.datetime.strptime(
+                    '2020-07-20T09:00:00Z', '%Y-%m-%dT%H:%M:%SZ')
+            )
+        )
+        original_commit_model_2.put(update_last_updated_time=False)
+
+        output = self._run_one_off_job()
+        self.assertItemsEqual(
+            [['FAILURE_INCORRECT - CollectionCommitLogEntryModel',
+              ['id1', 'id2']]],
+            output)
+
+        migrated_commit_model_1 = (
+            collection_models.CollectionCommitLogEntryModel.get_by_id('id1'))
+        self.assertEqual(
+            original_commit_model_1.created_on,
+            migrated_commit_model_1.created_on)
+        self.assertEqual(
+            original_commit_model_1.last_updated,
+            migrated_commit_model_1.last_updated)
+
+        migrated_commit_model_2 = (
+            collection_models.CollectionCommitLogEntryModel.get_by_id('id2'))
+        self.assertEqual(
+            original_commit_model_2.created_on,
+            migrated_commit_model_2.created_on)
+        self.assertEqual(
+            original_commit_model_2.last_updated,
+            migrated_commit_model_2.last_updated)

@@ -1,18 +1,18 @@
 {
   "dependencies": {
     "backend": {
-      "backports.functools_lru_cache ": {
-        "version": "1.5",
+      "backports.functools_lru_cache": {
+        "version": "1.6.1",
         "downloadFormat": "tar",
-        "url": "https://pypi.python.org/packages/57/d4/156eb5fbb08d2e85ab0a632e2bebdad355798dece07d4752f66a8d02d1ea/backports.functools_lru_cache-1.5.tar.gz#md5=2e271cab23c4c4d1de2f7ee80a1736bb",
+        "url": "https://files.pythonhosted.org/packages/ad/2e/aa84668861c3de458c5bcbfb9813f0e26434e2232d3e294469e96efac884/backports.functools_lru_cache-1.6.1.tar.gz#md5=103000b21a8e683647e2ce41929f2a9d",
         "tarRootDirPrefix": "backports.functools_lru_cache-",
         "rootDirPrefix": "backports.functools_lru_cache-",
         "targetDirPrefix": "backports.functools_lru_cache-"
       },
       "bleach": {
-        "version": "3.1.0",
+        "version": "3.1.5",
         "downloadFormat": "zip",
-        "url": "https://github.com/jsocol/bleach/archive/v3.1.0.zip",
+        "url": "https://github.com/jsocol/bleach/archive/v3.1.5.zip",
         "rootDirPrefix": "bleach-",
         "targetDirPrefix": "bleach-"
       },
@@ -49,24 +49,32 @@
         "targetDirPrefix": "graphy-"
       },
       "html5Lib": {
-        "version": "1.0.1",
+        "version": "1.1",
         "downloadFormat": "zip",
-        "url": "https://github.com/html5lib/html5lib-python/archive/1.0.1.zip",
+        "url": "https://github.com/html5lib/html5lib-python/archive/1.1.zip",
         "rootDirPrefix": "html5lib-python-",
         "targetDirPrefix": "html5lib-python-"
       },
-      "simpleJson": {
-        "version": "3.16.0",
+      "packaging": {
+        "version": "20.4",
         "downloadFormat": "tar",
-        "url": "https://files.pythonhosted.org/packages/e3/24/c35fb1c1c315fc0fffe61ea00d3f88e85469004713dab488dee4f35b0aff/simplejson-3.16.0.tar.gz",
+        "url": "https://files.pythonhosted.org/packages/55/fd/fc1aca9cf51ed2f2c11748fa797370027babd82f87829c7a8e6dbe720145/packaging-20.4.tar.gz#md5=3208229da731c5d8e29d4d8941e75005",
+        "tarRootDirPrefix": "packaging-",
+        "rootDirPrefix": "packaging-",
+        "targetDirPrefix": "packaging-"
+      },
+      "simpleJson": {
+        "version": "3.17.0",
+        "downloadFormat": "tar",
+        "url": "https://files.pythonhosted.org/packages/98/87/a7b98aa9256c8843f92878966dc3d8d914c14aad97e2c5ce4798d5743e07/simplejson-3.17.0.tar.gz",
         "tarRootDirPrefix": "simplejson-",
         "rootDirPrefix": "simplejson-",
         "targetDirPrefix": "simplejson-"
       },
       "six": {
-        "version": "1.12.0",
+        "version": "1.15.0",
         "downloadFormat": "tar",
-        "url": "https://files.pythonhosted.org/packages/dd/bf/4138e7bfb757de47d1f4b6994648ec67a51efe58fa907c1e11e350cddfca/six-1.12.0.tar.gz",
+        "url": "https://files.pythonhosted.org/packages/6b/34/415834bfdafca3c5f451532e8a8d9ba89a21c9743a0c59fbd0205c7f9426/six-1.15.0.tar.gz#md5=9f90a0eaa0ea7747fda01ca79d21ebcb",
         "tarRootDirPrefix": "six-",
         "rootDirPrefix": "six-",
         "targetDirPrefix": "six-"
@@ -88,25 +96,33 @@
         "targetDirPrefix": "callbacks-"
       },
       "beautifulSoup": {
-        "version": "4.7.1",
+        "version": "4.9.1",
         "downloadFormat": "tar",
-        "url": "https://pypi.python.org/packages/80/f2/f6aca7f1b209bb9a7ef069d68813b091c8c3620642b568dac4eb0e507748/beautifulsoup4-4.7.1.tar.gz#md5=321d73746d06bd9a8fcc3787b3fb7598",
+        "url": "https://files.pythonhosted.org/packages/c6/62/8a2bef01214eeaa5a4489eca7104e152968729512ee33cb5fbbc37a896b7/beautifulsoup4-4.9.1.tar.gz#md5=57502b5b34ccfd97b180260071f5799a",
         "tarRootDirPrefix": "beautifulsoup4-",
         "rootDirPrefix": "beautifulsoup4-",
         "targetDirPrefix": "beautifulsoup4-"
       },
       "mutagen": {
-        "version": "1.42.0",
+        "version": "1.43.0",
         "downloadFormat": "tar",
-        "url": "https://files.pythonhosted.org/packages/30/4c/5ad1a6e1ccbcfaf6462db727989c302d9d721beedd9b09c11e6f0c7065b0/mutagen-1.42.0.tar.gz",
+        "url": "https://files.pythonhosted.org/packages/aa/fd/ed738775442e3614849fefdf41417d7bff3ccb010d49c8f729432cc3c1e5/mutagen-1.43.0.tar.gz#md5=3154511015860685b3882c068258ae65",
         "tarRootDirPrefix": "mutagen-",
         "rootDirPrefix": "mutagen-",
         "targetDirPrefix": "mutagen-"
       },
-      "soupsieve": {
-        "version": "1.9.1",
+      "pylatexenc": {
+        "version": "2.6",
         "downloadFormat": "tar",
-        "url": "https://files.pythonhosted.org/packages/fb/9e/2e236603b058daa6820193d4d95f4dcfbbbd0d3c709bec8c6ef1b1902501/soupsieve-1.9.1.tar.gz",
+        "url": "https://files.pythonhosted.org/packages/be/0b/7a3bc86c8f0b9bb2eb03c1c0e6be15d859ec4f30d642f15d5f38aaee8640/pylatexenc-2.6.tar.gz#md5=98832370ce1aaa96caf493538c1e6aef",
+        "tarRootDirPrefix": "pylatexenc-",
+        "rootDirPrefix": "pylatexenc-",
+        "targetDirPrefix": "pylatexenc-"
+      },
+      "soupsieve": {
+        "version": "1.9.5",
+        "downloadFormat": "tar",
+        "url": "https://files.pythonhosted.org/packages/92/cf/57dfed8a00f4ba33af3a6615d693bb65a19a11e26ab13293f62359216417/soupsieve-1.9.5.tar.gz#md5=9b6c71b20fb1a73d2594f9e609464132",
         "tarRootDirPrefix": "soupsieve-",
         "rootDirPrefix": "soupsieve-",
         "targetDirPrefix": "soupsieve-"
@@ -129,7 +145,7 @@
         ],
         "bundle": {
           "js": [
-            "angular-animate.js", "angular-resource.js", "angular-sanitize.js",
+            "angular-animate.js", "angular-sanitize.js",
             "angular-touch.js", "angular-aria.js"
           ]
         }
@@ -335,11 +351,11 @@
         "files": ["angular-simple-logger.min.js"]
       },
       "guppy": {
-        "version": "b5055b963fdbea5c6c1e92dbf58fdaf3ea0cd8ba",
+        "version": "1759992a3885cb99d3ead04241f318a074c9f963",
         "downloadFormat": "zip",
-        "url": "https://github.com/daniel3735928559/guppy/archive/b5055b963fdbea5c6c1e92dbf58fdaf3ea0cd8ba.zip",
+        "url": "https://github.com/daniel3735928559/guppy/archive/1759992a3885cb99d3ead04241f318a074c9f963.zip",
         "rootDirPrefix": "guppy-",
-        "targetDir": "guppy-b5055b"
+        "targetDir": "guppy-175999"
       },
       "headroomJs": {
         "version": "0.9.4",
@@ -350,9 +366,9 @@
         "files": ["angular.headroom.min.js", "headroom.min.js"]
       },
       "jquery": {
-        "version": "3.4.1",
+        "version": "3.5.1",
         "downloadFormat": "files",
-        "url": "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1",
+        "url": "https://ajax.googleapis.com/ajax/libs/jquery/3.5.1",
         "rootDirPrefix": "jquery-",
         "targetDirPrefix": "jquery-",
         "files": ["jquery.js", "jquery.min.js", "jquery.min.js.map"]
@@ -386,17 +402,6 @@
         "rootDirPrefix": "MathJax-",
         "targetDirPrefix": "MathJax-"
       },
-      "mathJs": {
-        "version": "5.10.3",
-        "downloadFormat": "files",
-        "url": "https://cdnjs.cloudflare.com/ajax/libs/mathjs/5.10.3",
-        "rootDirPrefix": "math-js-",
-        "targetDirPrefix": "math-js-",
-        "files": ["math.js", "math.min.js", "math.min.map"],
-        "bundle": {
-          "js": ["math.js"]
-        }
-      },
       "midiJs": {
         "version": "a8a84257afa70721ae462448048a87301fc1554a",
         "downloadFormat": "zip",
@@ -413,17 +418,6 @@
         "bundle": {
           "css": ["ng-joyride.css"],
           "js": ["ng-joyride.js"]
-        }
-      },
-      "ngImageCrop": {
-        "version": "0.3.2",
-        "downloadFormat": "zip",
-        "url": "https://github.com/alexk111/ngImgCrop/archive/v0.3.2.zip",
-        "rootDirPrefix": "ngImgCrop-",
-        "targetDirPrefix": "ng-img-crop-",
-        "bundle": {
-          "css": ["compile/minified/ng-img-crop.css"],
-          "js": ["compile/minified/ng-img-crop.js"]
         }
       },
       "ngInfiniteScroll": {
@@ -517,14 +511,6 @@
         "bundle": {
           "js": ["src/validate.js"]
         }
-      },
-      "waveSurferJs": {
-        "version": "2.2.1",
-        "downloadFormat": "files",
-        "url": "https://unpkg.com/wavesurfer.js@2.2.1/dist",
-        "rootDirPrefix": "waveSurfer-js-",
-        "targetDirPrefix": "wave-surfer-js-",
-        "files": ["wavesurfer.min.js"]
       }
     },
     "oppiaTools": {
@@ -534,13 +520,6 @@
         "url": "https://github.com/yui/yuicompressor/releases/download/v2.4.8",
         "files": ["yuicompressor-2.4.8.jar"],
         "targetDirPrefix": "yuicompressor-"
-      },
-      "browsermob-proxy": {
-        "version": "2.1.1",
-        "downloadFormat": "zip",
-        "url": "https://github.com/lightbody/browsermob-proxy/releases/download/browsermob-proxy-2.1.1/browsermob-proxy-2.1.1-bin.zip",
-        "rootDirPrefix": "browsermob-proxy-",
-        "targetDirPrefix": "browsermob-proxy-"
       }
     }
   }

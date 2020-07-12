@@ -185,33 +185,31 @@ class EmailRightsTest(test_utils.GenericTestBase):
                 True, True, True, False),
         }
 
-        # pylint: disable=protected-access
         for intent in expected_validation_results:
             for ind, sender_id in enumerate(sender_ids_to_test):
                 if expected_validation_results[intent][ind]:
-                    email_manager._require_sender_id_is_valid(
+                    email_manager.require_sender_id_is_valid(
                         intent, sender_id)
                 else:
                     with self.assertRaisesRegexp(
                         Exception, 'Invalid sender_id'
                         ):
-                        email_manager._require_sender_id_is_valid(
+                        email_manager.require_sender_id_is_valid(
                             intent, sender_id)
 
         # Also test null and invalid intent strings.
         with self.assertRaisesRegexp(Exception, 'Invalid email intent string'):
-            email_manager._require_sender_id_is_valid(
+            email_manager.require_sender_id_is_valid(
                 '', feconf.SYSTEM_COMMITTER_ID)
         with self.assertRaisesRegexp(Exception, 'Invalid email intent string'):
-            email_manager._require_sender_id_is_valid(
+            email_manager.require_sender_id_is_valid(
                 '', self.admin_id)
         with self.assertRaisesRegexp(Exception, 'Invalid email intent string'):
-            email_manager._require_sender_id_is_valid(
+            email_manager.require_sender_id_is_valid(
                 'invalid_intent', feconf.SYSTEM_COMMITTER_ID)
         with self.assertRaisesRegexp(Exception, 'Invalid email intent string'):
-            email_manager._require_sender_id_is_valid(
+            email_manager.require_sender_id_is_valid(
                 'invalid_intent', self.admin_id)
-        # pylint: enable=protected-access
 
 
 class ExplorationMembershipEmailTests(test_utils.GenericTestBase):
@@ -1343,7 +1341,7 @@ class FeedbackMessageBatchEmailTests(test_utils.GenericTestBase):
             '<li>Message 1.3<br></li>'
             '</ul></li></ul>'
             'You can view and reply to your messages from your '
-            '<a href="https://www.oppia.org/creator_dashboard">dashboard</a>.'
+            '<a href="https://www.oppia.org/creator-dashboard">dashboard</a>.'
             '<br>'
             '<br>Thanks, and happy teaching!<br>'
             '<br>'
@@ -1865,6 +1863,7 @@ class FlagExplorationEmailTest(test_utils.GenericTestBase):
 
 class OnboardingReviewerInstantEmailTests(test_utils.GenericTestBase):
     """Test that correct email is sent while onboarding reviewers."""
+
     REVIEWER_USERNAME = 'reviewer'
     REVIEWER_EMAIL = 'reviewer@example.com'
 
@@ -1900,7 +1899,7 @@ class OnboardingReviewerInstantEmailTests(test_utils.GenericTestBase):
             'ensure that any edits made to lessons preserve the lessons\' '
             'quality and are beneficial for students.<br><br>'
             'If you\'d like to help out as a reviewer, please visit your '
-            '<a href="https://www.oppia.org/creator_dashboard/">dashboard</a>. '
+            '<a href="https://www.oppia.org/creator-dashboard/">dashboard</a>. '
             'and set your review preferences accordingly. Note that, if you '
             'accept,you will receive occasional emails inviting you to review '
             'incoming suggestions by others.<br><br>'
@@ -1942,6 +1941,7 @@ class OnboardingReviewerInstantEmailTests(test_utils.GenericTestBase):
 
 class NotifyReviewerInstantEmailTests(test_utils.GenericTestBase):
     """Test that correct email is sent while notifying reviewers."""
+
     REVIEWER_USERNAME = 'reviewer'
     REVIEWER_EMAIL = 'reviewer@example.com'
 
@@ -1971,7 +1971,7 @@ class NotifyReviewerInstantEmailTests(test_utils.GenericTestBase):
             'review in Algebra, which you are registered as a reviewer for.'
             '<br><br>Please take a look at and accept/reject these suggestions '
             'at your earliest convenience. You can visit your '
-            '<a href="https://www.oppia.org/creator_dashboard/">dashboard</a> '
+            '<a href="https://www.oppia.org/creator-dashboard/">dashboard</a> '
             'to view the list of suggestions that need a review.<br><br>'
             'Thank you for helping improve Oppia\'s lessons!'
             '- The Oppia Team<br>'
@@ -2012,6 +2012,7 @@ class QueryStatusNotificationEmailTests(test_utils.GenericTestBase):
     """Test that email is send to submitter when query has completed
     or failed.
     """
+
     SUBMITTER_USERNAME = 'submit'
     SUBMITTER_EMAIL = 'submit@example.com'
     SENDER_USERNAME = 'sender'
@@ -2212,6 +2213,7 @@ class QueryStatusNotificationEmailTests(test_utils.GenericTestBase):
 
 class VoiceoverApplicationEmailUnitTest(test_utils.GenericTestBase):
     """Unit test related to voiceover application emails."""
+
     APPLICANT_USERNAME = 'applicant'
     APPLICANT_EMAIL = 'applicant@example.com'
 
@@ -2289,7 +2291,7 @@ class VoiceoverApplicationEmailUnitTest(test_utils.GenericTestBase):
             'language English got rejected and the reviewer has left a message.'
             '<br><br>Review message: A rejection message!<br><br>'
             'You can create a new voiceover application through the'
-            '<a href="https://oppia.org/community_dashboard">'
+            '<a href="https://oppia.org/community-dashboard">'
             'community dashboard</a> page.<br><br>'
             '- The Oppia Team<br>'
             '<br>'
@@ -2328,6 +2330,7 @@ class VoiceoverApplicationEmailUnitTest(test_utils.GenericTestBase):
 
 class AccountDeletionEmailUnitTest(test_utils.GenericTestBase):
     """Unit test related to account deletion application emails."""
+
     APPLICANT_USERNAME = 'applicant'
     APPLICANT_EMAIL = 'applicant@example.com'
 
@@ -2422,12 +2425,9 @@ class BulkEmailsTests(test_utils.GenericTestBase):
         email_text_body = 'Dummy email body.\n'
 
         with self.can_send_emails_ctx:
-            # pylint: disable=protected-access
-            email_manager._send_bulk_mail(
-                self.recipient_ids, self.sender_id,
-                feconf.BULK_EMAIL_INTENT_MARKETING, email_subject,
-                email_html_body, self.SENDER_EMAIL, self.SENDER_USERNAME)
-            # pylint: enable=protected-access
+            email_manager.send_user_query_email(
+                self.sender_id, self.recipient_ids, email_subject,
+                email_html_body, feconf.BULK_EMAIL_INTENT_MARKETING)
 
         messages_a = self.mail_stub.get_sent_messages(to=self.RECIPIENT_A_EMAIL)
         self.assertEqual(len(messages_a), 1)
@@ -2484,13 +2484,9 @@ class BulkEmailsTests(test_utils.GenericTestBase):
     def test_that_exception_is_raised_for_unauthorised_sender(self):
         with self.can_send_emails_ctx, self.assertRaisesRegexp(
             Exception, 'Invalid sender_id for email'):
-            # pylint: disable=protected-access
-            email_manager._send_bulk_mail(
-                self.recipient_ids, self.fake_sender_id,
-                feconf.BULK_EMAIL_INTENT_MARKETING, 'email_subject',
-                'email_html_body', self.FAKE_SENDER_EMAIL,
-                self.FAKE_SENDER_USERNAME)
-            # pylint: enable=protected-access
+            email_manager.send_user_query_email(
+                self.fake_sender_id, self.recipient_ids, 'email_subject',
+                'email_html_body', feconf.BULK_EMAIL_INTENT_MARKETING)
 
         messages_a = self.mail_stub.get_sent_messages(to=self.RECIPIENT_A_EMAIL)
         self.assertEqual(len(messages_a), 0)
@@ -2650,6 +2646,7 @@ class ModeratorActionEmailsTests(test_utils.GenericTestBase):
 
 class CommunityReviewerEmailTest(test_utils.GenericTestBase):
     """Test for assignment and removal of reviewer in community."""
+
     TRANSLATION_REVIEWER_EMAIL = 'translationreviewer@example.com'
     VOICEOVER_REVIEWER_EMAIL = 'voiceoverreviewer@example.com'
     QUESTION_REVIEWER_EMAIL = 'questionreviewer@example.com'
@@ -2722,7 +2719,7 @@ class CommunityReviewerEmailTest(test_utils.GenericTestBase):
             'review translation suggestions made by contributors in the '
             'Hindi language.<br><br>'
             'You can check the translation suggestions waiting for review in '
-            'the <a href="https://www.oppia.org/community_dashboard">'
+            'the <a href="https://www.oppia.org/community-dashboard">'
             'Community Dashboard</a>.<br><br>'
             'Thanks, and happy contributing!<br><br>'
             'Best wishes,<br>'
@@ -2768,7 +2765,7 @@ class CommunityReviewerEmailTest(test_utils.GenericTestBase):
             'review voiceover applications made by contributors in the '
             'Hindi language.<br><br>'
             'You can check the voiceover applications waiting for review in '
-            'the <a href="https://www.oppia.org/community_dashboard">'
+            'the <a href="https://www.oppia.org/community-dashboard">'
             'Community Dashboard</a>.<br><br>'
             'Thanks, and happy contributing!<br><br>'
             'Best wishes,<br>'
@@ -2813,7 +2810,7 @@ class CommunityReviewerEmailTest(test_utils.GenericTestBase):
             'reviewer for questions. This allows you to review question '
             'suggestions made by contributors.<br><br>'
             'You can check the question suggestions waiting for review in the '
-            '<a href="https://www.oppia.org/community_dashboard">'
+            '<a href="https://www.oppia.org/community-dashboard">'
             'Community Dashboard</a>.<br><br>'
             'Thanks, and happy contributing!<br><br>'
             'Best wishes,<br>'
@@ -2891,7 +2888,7 @@ class CommunityReviewerEmailTest(test_utils.GenericTestBase):
             'in the Hindi language. You won\'t be able to review translation '
             'suggestions made by contributors in the Hindi language any more, '
             'but you can still contribute translations through the '
-            '<a href="https://www.oppia.org/community_dashboard">'
+            '<a href="https://www.oppia.org/community-dashboard">'
             'Community Dashboard</a>.<br><br>'
             'Thanks, and happy contributing!<br><br>'
             'Best wishes,<br>'
@@ -2937,7 +2934,7 @@ class CommunityReviewerEmailTest(test_utils.GenericTestBase):
             'in the Hindi language. You won\'t be able to review voiceover '
             'applications made by contributors in the Hindi language any more, '
             'but you can still contribute voiceovers through the '
-            '<a href="https://www.oppia.org/community_dashboard">'
+            '<a href="https://www.oppia.org/community-dashboard">'
             'Community Dashboard</a>.<br><br>'
             'Thanks, and happy contributing!<br><br>'
             'Best wishes,<br>'
@@ -2981,7 +2978,7 @@ class CommunityReviewerEmailTest(test_utils.GenericTestBase):
             'The Oppia team has removed you from the question reviewer role. '
             'You won\'t be able to review question suggestions made by '
             'contributors any more, but you can still contribute questions '
-            'through the <a href="https://www.oppia.org/community_dashboard">'
+            'through the <a href="https://www.oppia.org/community-dashboard">'
             'Community Dashboard</a>.<br><br>'
             'Thanks, and happy contributing!<br><br>'
             'Best wishes,<br>'

@@ -34,11 +34,16 @@ angular.module('oppia').directive('searchResults', [
         '/pages/library-page/search-results/search-results.directive.html'),
       controllerAs: '$ctrl',
       controller: [
-        '$scope', '$rootScope', '$q', '$timeout', '$window',
+        '$scope', '$q', '$timeout', '$window', 'LoaderService',
         'SiteAnalyticsService', 'UserService',
-        function($scope, $rootScope, $q, $timeout, $window,
+        function($scope, $q, $timeout, $window, LoaderService,
             SiteAnalyticsService, UserService) {
           var ctrl = this;
+
+          ctrl.getStaticImageUrl = function(imagePath) {
+            return UrlInterpolationService.getStaticImageUrl(imagePath);
+          };
+
           ctrl.onRedirectToLogin = function(destinationUrl) {
             SiteAnalyticsService.registerStartLoginEvent('noSearchResults');
             $timeout(function() {
@@ -50,7 +55,7 @@ angular.module('oppia').directive('searchResults', [
             ctrl.someResultsExist = true;
 
             ctrl.userIsLoggedIn = null;
-            $rootScope.loadingMessage = 'Loading';
+            LoaderService.showLoadingScreen('Loading');
             var userInfoPromise = UserService.getUserInfoAsync();
             userInfoPromise.then(function(userInfo) {
               ctrl.userIsLoggedIn = userInfo.isLoggedIn();
@@ -65,12 +70,8 @@ angular.module('oppia').directive('searchResults', [
             );
 
             $q.all([userInfoPromise, searchResultsPromise]).then(function() {
-              $rootScope.loadingMessage = '';
+              LoaderService.hideLoadingScreen();
             });
-
-            ctrl.noExplorationsImgUrl =
-             UrlInterpolationService.getStaticImageUrl(
-               '/general/no_explorations_found.png');
           };
         }
       ]

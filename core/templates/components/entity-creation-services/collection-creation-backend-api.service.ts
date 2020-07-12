@@ -16,29 +16,47 @@
  * collection_id.
  */
 
-angular.module('oppia').factory('CollectionCreationBackendService', [
-  '$http', '$q',
-  function(
-      $http, $q) {
-    var _createCollection = function(successCallback, errorCallback) {
-      $http.post('/collection_editor_handler/create_new')
-        .then(function(response) {
-          if (successCallback) {
-            successCallback(response.data);
-          }
-        }, function() {
-          if (errorCallback) {
-            errorCallback();
-          }
-        });
-    };
+import { downgradeInjectable } from '@angular/upgrade/static';
+import { HttpClient } from '@angular/common/http';
+import { Injectable } from '@angular/core';
 
-    return {
-      createCollection: function() {
-        return $q(function(resolve, reject) {
-          _createCollection(resolve, reject);
-        });
-      }
-    };
+interface CollectionCreationResponse {
+  collectionId: string
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class CollectionCreationBackendService {
+  constructor(private http: HttpClient) {}
+
+  private _createCollection(
+      successCallback: (value?: Object | PromiseLike<Object>) => void,
+      errorCallback: (reason?: string) => void): void {
+    this.http.post<CollectionCreationResponse>(
+      '/collection_editor_handler/create_new', {}).toPromise()
+      .then(response => {
+        if (successCallback) {
+          // NOTE: The response doesn't need to return a domain object
+          // because the response just returns collectionId and the the case
+          // of the keys of the backend dict is already in camelCase.
+          successCallback(response);
+        }
+      }, () => {
+        if (errorCallback) {
+          errorCallback();
+        }
+      });
   }
-]);
+
+
+  createCollection(): Promise<CollectionCreationResponse> {
+    return new Promise((resolve, reject) => {
+      this._createCollection(resolve, reject);
+    });
+  }
+}
+
+angular.module('oppia').factory(
+  'CollectionCreationBackendService',
+  downgradeInjectable(CollectionCreationBackendService));

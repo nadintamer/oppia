@@ -24,28 +24,32 @@ require('domain/editor/undo_redo/undo-redo.service.ts');
 require('domain/story/story-domain.constants.ajs.ts');
 
 angular.module('oppia').factory('StoryUpdateService', [
-  'AlertsService', 'ChangeObjectFactory', 'UndoRedoService',
-  'CMD_ADD_STORY_NODE', 'CMD_DELETE_STORY_NODE',
+  'AlertsService', 'ChangeObjectFactory', 'StoryEditorStateService',
+  'UndoRedoService', 'CMD_ADD_STORY_NODE', 'CMD_DELETE_STORY_NODE',
   'CMD_UPDATE_STORY_CONTENTS_PROPERTY', 'CMD_UPDATE_STORY_NODE_OUTLINE_STATUS',
   'CMD_UPDATE_STORY_NODE_PROPERTY', 'CMD_UPDATE_STORY_PROPERTY',
   'INITIAL_NODE_ID', 'STORY_NODE_PROPERTY_ACQUIRED_SKILL_IDS',
-  'STORY_NODE_PROPERTY_DESTINATION_NODE_IDS',
+  'STORY_NODE_PROPERTY_DESCRIPTION', 'STORY_NODE_PROPERTY_DESTINATION_NODE_IDS',
   'STORY_NODE_PROPERTY_EXPLORATION_ID',
   'STORY_NODE_PROPERTY_OUTLINE', 'STORY_NODE_PROPERTY_PREREQUISITE_SKILL_IDS',
-  'STORY_NODE_PROPERTY_TITLE', 'STORY_PROPERTY_DESCRIPTION',
-  'STORY_PROPERTY_LANGUAGE_CODE', 'STORY_PROPERTY_NOTES',
-  'STORY_PROPERTY_TITLE', function(
-      AlertsService, ChangeObjectFactory, UndoRedoService,
-      CMD_ADD_STORY_NODE, CMD_DELETE_STORY_NODE,
+  'STORY_NODE_PROPERTY_THUMBNAIL_BG_COLOR',
+  'STORY_NODE_PROPERTY_THUMBNAIL_FILENAME', 'STORY_NODE_PROPERTY_TITLE',
+  'STORY_PROPERTY_DESCRIPTION', 'STORY_PROPERTY_LANGUAGE_CODE',
+  'STORY_PROPERTY_NOTES', 'STORY_PROPERTY_THUMBNAIL_BG_COLOR',
+  'STORY_PROPERTY_THUMBNAIL_FILENAME', 'STORY_PROPERTY_TITLE', function(
+      AlertsService, ChangeObjectFactory, StoryEditorStateService,
+      UndoRedoService, CMD_ADD_STORY_NODE, CMD_DELETE_STORY_NODE,
       CMD_UPDATE_STORY_CONTENTS_PROPERTY, CMD_UPDATE_STORY_NODE_OUTLINE_STATUS,
       CMD_UPDATE_STORY_NODE_PROPERTY, CMD_UPDATE_STORY_PROPERTY,
       INITIAL_NODE_ID, STORY_NODE_PROPERTY_ACQUIRED_SKILL_IDS,
-      STORY_NODE_PROPERTY_DESTINATION_NODE_IDS,
+      STORY_NODE_PROPERTY_DESCRIPTION, STORY_NODE_PROPERTY_DESTINATION_NODE_IDS,
       STORY_NODE_PROPERTY_EXPLORATION_ID,
       STORY_NODE_PROPERTY_OUTLINE, STORY_NODE_PROPERTY_PREREQUISITE_SKILL_IDS,
-      STORY_NODE_PROPERTY_TITLE, STORY_PROPERTY_DESCRIPTION,
-      STORY_PROPERTY_LANGUAGE_CODE, STORY_PROPERTY_NOTES,
-      STORY_PROPERTY_TITLE) {
+      STORY_NODE_PROPERTY_THUMBNAIL_BG_COLOR,
+      STORY_NODE_PROPERTY_THUMBNAIL_FILENAME, STORY_NODE_PROPERTY_TITLE,
+      STORY_PROPERTY_DESCRIPTION, STORY_PROPERTY_LANGUAGE_CODE,
+      STORY_PROPERTY_NOTES, STORY_PROPERTY_THUMBNAIL_BG_COLOR,
+      STORY_PROPERTY_THUMBNAIL_FILENAME, STORY_PROPERTY_TITLE) {
     // Creates a change using an apply function, reverse function, a change
     // command and related parameters. The change is applied to a given
     // story.
@@ -72,7 +76,7 @@ angular.module('oppia').factory('StoryUpdateService', [
     var _getStoryNode = function(storyContents, nodeId) {
       var storyNodeIndex = storyContents.getNodeIndex(nodeId);
       if (storyNodeIndex === -1) {
-        throw Error('The given node doesn\'t exist');
+        throw new Error('The given node doesn\'t exist');
       }
       return storyContents.getNodes()[storyNodeIndex];
     };
@@ -123,12 +127,50 @@ angular.module('oppia').factory('StoryUpdateService', [
         _applyStoryPropertyChange(
           story, STORY_PROPERTY_TITLE, oldTitle, title,
           function(changeDict, story) {
-            // Apply
+            // ---- Apply ----
             var title = _getNewPropertyValueFromChangeDict(changeDict);
             story.setTitle(title);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.setTitle(oldTitle);
+          });
+      },
+
+      /**
+       * Changes the thumbnail filename of a story and records the change
+       * in the undo/redo service.
+       */
+      setThumbnailFilename: function(story, newThumbnailFilename) {
+        var oldThumbnailFilename = angular.copy(story.getThumbnailFilename());
+        _applyStoryPropertyChange(
+          story, STORY_PROPERTY_THUMBNAIL_FILENAME, oldThumbnailFilename,
+          newThumbnailFilename, function(changeDict, story) {
+            // ---- Apply ----
+            var thumbnailFilename = (
+              _getNewPropertyValueFromChangeDict(changeDict));
+            story.setThumbnailFilename(thumbnailFilename);
+          }, function(changeDict, story) {
+            // ---- Undo ----
+            story.setThumbnailFilename(oldThumbnailFilename);
+          });
+      },
+
+      /**
+       * Changes the thumbnail background color of a story and records the
+       * change in the undo/redo service.
+       */
+      setThumbnailBgColor: function(story, newThumbnailBgColor) {
+        var oldThumbnailBgColor = angular.copy(story.getThumbnailBgColor());
+        _applyStoryPropertyChange(
+          story, STORY_PROPERTY_THUMBNAIL_BG_COLOR, oldThumbnailBgColor,
+          newThumbnailBgColor, function(changeDict, story) {
+            // ---- Apply ----
+            var thumbnailBgColor = (
+              _getNewPropertyValueFromChangeDict(changeDict));
+            story.setThumbnailBgColor(thumbnailBgColor);
+          }, function(changeDict, story) {
+            // ---- Undo ----
+            story.setThumbnailBgColor(oldThumbnailBgColor);
           });
       },
 
@@ -141,11 +183,11 @@ angular.module('oppia').factory('StoryUpdateService', [
         _applyStoryPropertyChange(
           story, STORY_PROPERTY_DESCRIPTION, oldDescription, description,
           function(changeDict, story) {
-            // Apply
+            // ---- Apply ----
             var description = _getNewPropertyValueFromChangeDict(changeDict);
             story.setDescription(description);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.setDescription(oldDescription);
           });
       },
@@ -159,11 +201,11 @@ angular.module('oppia').factory('StoryUpdateService', [
         _applyStoryPropertyChange(
           story, STORY_PROPERTY_NOTES, oldNotes, notes,
           function(changeDict, story) {
-            // Apply
+            // ---- Apply ----
             var notes = _getNewPropertyValueFromChangeDict(changeDict);
             story.setNotes(notes);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.setNotes(oldNotes);
           });
       },
@@ -177,11 +219,11 @@ angular.module('oppia').factory('StoryUpdateService', [
         _applyStoryPropertyChange(
           story, STORY_PROPERTY_LANGUAGE_CODE, oldLanguageCode, languageCode,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             var languageCode = _getNewPropertyValueFromChangeDict(changeDict);
             story.setLanguageCode(languageCode);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.setLanguageCode(oldLanguageCode);
           });
       },
@@ -197,10 +239,10 @@ angular.module('oppia').factory('StoryUpdateService', [
           story, INITIAL_NODE_ID, oldInitialNodeId,
           newInitialNodeId,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             story.getStoryContents().setInitialNodeId(newInitialNodeId);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.getStoryContents().setInitialNodeId(oldInitialNodeId);
           });
       },
@@ -215,12 +257,14 @@ angular.module('oppia').factory('StoryUpdateService', [
           node_id: nextNodeId,
           title: nodeTitle
         }, function(changeDict, story) {
-          // Apply.
+          // ---- Apply ----
           story.getStoryContents().addNode(nodeTitle);
+          StoryEditorStateService.setExpIdsChanged();
         }, function(changeDict, story) {
-          // Undo.
+          // ---- Undo ----
           var nodeId = _getNodeIdFromChangeDict(changeDict);
           story.getStoryContents().deleteNode(nodeId);
+          StoryEditorStateService.setExpIdsChanged();
         });
       },
 
@@ -232,11 +276,12 @@ angular.module('oppia').factory('StoryUpdateService', [
         _applyChange(story, CMD_DELETE_STORY_NODE, {
           node_id: nodeId
         }, function(changeDict, story) {
-          // Apply.
+          // ---- Apply ----
           story.getStoryContents().deleteNode(nodeId);
+          StoryEditorStateService.setExpIdsChanged();
         }, function(changeDict, story) {
-          // Undo.
-          throw Error('A deleted story node cannot be restored.');
+          // ---- Undo ----
+          throw new Error('A deleted story node cannot be restored.');
         });
       },
 
@@ -247,17 +292,17 @@ angular.module('oppia').factory('StoryUpdateService', [
       finalizeStoryNodeOutline: function(story, nodeId) {
         var storyNode = _getStoryNode(story.getStoryContents(), nodeId);
         if (storyNode.getOutlineStatus()) {
-          throw Error('Node outline is already finalized.');
+          throw new Error('Node outline is already finalized.');
         }
         _applyChange(story, CMD_UPDATE_STORY_NODE_OUTLINE_STATUS, {
           node_id: nodeId,
           old_value: false,
           new_value: true
         }, function(changeDict, story) {
-          // Apply.
+          // ---- Apply ----
           story.getStoryContents().markNodeOutlineAsFinalized(nodeId);
         }, function(changeDict, story) {
-          // Undo.
+          // ---- Undo ----
           story.getStoryContents().markNodeOutlineAsNotFinalized(nodeId);
         });
       },
@@ -269,17 +314,17 @@ angular.module('oppia').factory('StoryUpdateService', [
       unfinalizeStoryNodeOutline: function(story, nodeId) {
         var storyNode = _getStoryNode(story.getStoryContents(), nodeId);
         if (!storyNode.getOutlineStatus()) {
-          throw Error('Node outline is already not finalized.');
+          throw new Error('Node outline is already not finalized.');
         }
         _applyChange(story, CMD_UPDATE_STORY_NODE_OUTLINE_STATUS, {
           node_id: nodeId,
           old_value: true,
           new_value: false
         }, function(changeDict, story) {
-          // Apply.
+          // ---- Apply ----
           story.getStoryContents().markNodeOutlineAsNotFinalized(nodeId);
         }, function(changeDict, story) {
-          // Undo.
+          // ---- Undo ----
           story.getStoryContents().markNodeOutlineAsFinalized(nodeId);
         });
       },
@@ -296,10 +341,10 @@ angular.module('oppia').factory('StoryUpdateService', [
           story, STORY_NODE_PROPERTY_OUTLINE, nodeId,
           oldOutline, newOutline,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             story.getStoryContents().setNodeOutline(nodeId, newOutline);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.getStoryContents().setNodeOutline(
               nodeId, oldOutline);
           });
@@ -317,11 +362,73 @@ angular.module('oppia').factory('StoryUpdateService', [
           story, STORY_NODE_PROPERTY_TITLE, nodeId,
           oldTitle, newTitle,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             story.getStoryContents().setNodeTitle(nodeId, newTitle);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.getStoryContents().setNodeTitle(nodeId, oldTitle);
+          });
+      },
+
+      /**
+       * Sets the description of a node of the story and records the change
+       * in the undo/redo service.
+       */
+      setStoryNodeDescription: function(story, nodeId, newDescription) {
+        var storyNode = _getStoryNode(story.getStoryContents(), nodeId);
+        var oldDescription = storyNode.getDescription();
+
+        _applyStoryNodePropertyChange(
+          story, STORY_NODE_PROPERTY_DESCRIPTION, nodeId,
+          oldDescription, newDescription,
+          function(changeDict, story) {
+            // ---- Apply ----
+            story.getStoryContents().setNodeDescription(nodeId, newDescription);
+          }, function(changeDict, story) {
+            // ---- Undo ----
+            story.getStoryContents().setNodeDescription(nodeId, oldDescription);
+          });
+      },
+
+      /**
+       * Sets the thumbnail filename of a node of the story and records the
+       * change in the undo/redo service.
+       */
+      setStoryNodeThumbnailFilename: function(
+          story, nodeId, newThumbnailFilename) {
+        var storyNode = _getStoryNode(story.getStoryContents(), nodeId);
+        var oldThumbnailFilename = storyNode.getThumbnailFilename();
+
+        _applyStoryNodePropertyChange(
+          story, STORY_NODE_PROPERTY_THUMBNAIL_FILENAME, nodeId,
+          oldThumbnailFilename, newThumbnailFilename,
+          function(changeDict, story) {
+            // ---- Apply ----
+            storyNode.setThumbnailFilename(newThumbnailFilename);
+          }, function(changeDict, story) {
+            // ---- Undo ----
+            storyNode.setThumbnailFilename(oldThumbnailFilename);
+          });
+      },
+
+      /**
+       * Sets the thumbnail background color of a node of the story and records
+       * the change in the undo/redo service.
+       */
+      setStoryNodeThumbnailBgColor: function(
+          story, nodeId, newThumbnailBgColor) {
+        var storyNode = _getStoryNode(story.getStoryContents(), nodeId);
+        var oldThumbnailBgColor = storyNode.getThumbnailBgColor();
+
+        _applyStoryNodePropertyChange(
+          story, STORY_NODE_PROPERTY_THUMBNAIL_BG_COLOR, nodeId,
+          oldThumbnailBgColor, newThumbnailBgColor,
+          function(changeDict, story) {
+            // ---- Apply ----
+            storyNode.setThumbnailBgColor(newThumbnailBgColor);
+          }, function(changeDict, story) {
+            // ---- Undo ----
+            storyNode.setThumbnailBgColor(oldThumbnailBgColor);
           });
       },
 
@@ -337,13 +444,15 @@ angular.module('oppia').factory('StoryUpdateService', [
           story, STORY_NODE_PROPERTY_EXPLORATION_ID, nodeId,
           oldExplorationId, newExplorationId,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             story.getStoryContents().setNodeExplorationId(
               nodeId, newExplorationId);
+            StoryEditorStateService.setExpIdsChanged();
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.getStoryContents().setNodeExplorationId(
               nodeId, oldExplorationId);
+            StoryEditorStateService.setExpIdsChanged();
           });
       },
 
@@ -362,11 +471,11 @@ angular.module('oppia').factory('StoryUpdateService', [
           story, STORY_NODE_PROPERTY_DESTINATION_NODE_IDS, nodeId,
           oldDestinationNodeIds, newDestinationNodeIds,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             story.getStoryContents().addDestinationNodeIdToNode(
               nodeId, destinationNodeId);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.getStoryContents().removeDestinationNodeIdFromNode(
               nodeId, destinationNodeId);
           });
@@ -384,7 +493,7 @@ angular.module('oppia').factory('StoryUpdateService', [
         var newDestinationNodeIds = angular.copy(oldDestinationNodeIds);
         var index = newDestinationNodeIds.indexOf(destinationNodeId);
         if (index === -1) {
-          throw Error('The given destination node is not part of the node');
+          throw new Error('The given destination node is not part of the node');
         }
         newDestinationNodeIds.splice(index, 1);
 
@@ -392,13 +501,15 @@ angular.module('oppia').factory('StoryUpdateService', [
           story, STORY_NODE_PROPERTY_DESTINATION_NODE_IDS, nodeId,
           oldDestinationNodeIds, newDestinationNodeIds,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             story.getStoryContents().removeDestinationNodeIdFromNode(
               nodeId, destinationNodeId);
+            StoryEditorStateService.setExpIdsChanged();
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.getStoryContents().addDestinationNodeIdToNode(
               nodeId, destinationNodeId);
+            StoryEditorStateService.setExpIdsChanged();
           });
       },
 
@@ -416,11 +527,11 @@ angular.module('oppia').factory('StoryUpdateService', [
           story, STORY_NODE_PROPERTY_PREREQUISITE_SKILL_IDS, nodeId,
           oldPrerequisiteSkillIds, newPrerequisiteSkillIds,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             story.getStoryContents().addPrerequisiteSkillIdToNode(
               nodeId, skillId);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.getStoryContents().removePrerequisiteSkillIdFromNode(
               nodeId, skillId);
           });
@@ -437,7 +548,8 @@ angular.module('oppia').factory('StoryUpdateService', [
         var newPrerequisiteSkillIds = angular.copy(oldPrerequisiteSkillIds);
         var index = newPrerequisiteSkillIds.indexOf(skillId);
         if (index === -1) {
-          throw Error('The given prerequisite skill is not part of the node');
+          throw new Error(
+            'The given prerequisite skill is not part of the node');
         }
         newPrerequisiteSkillIds.splice(index, 1);
 
@@ -445,11 +557,11 @@ angular.module('oppia').factory('StoryUpdateService', [
           story, STORY_NODE_PROPERTY_PREREQUISITE_SKILL_IDS, nodeId,
           oldPrerequisiteSkillIds, newPrerequisiteSkillIds,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             story.getStoryContents().removePrerequisiteSkillIdFromNode(
               nodeId, skillId);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.getStoryContents().addPrerequisiteSkillIdToNode(
               nodeId, skillId);
           });
@@ -470,11 +582,11 @@ angular.module('oppia').factory('StoryUpdateService', [
           story, STORY_NODE_PROPERTY_ACQUIRED_SKILL_IDS, nodeId,
           oldAcquiredSkillIds, newAcquiredSkillIds,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             story.getStoryContents().addAcquiredSkillIdToNode(
               nodeId, skillId);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.getStoryContents().removeAcquiredSkillIdFromNode(
               nodeId, skillId);
           });
@@ -491,7 +603,8 @@ angular.module('oppia').factory('StoryUpdateService', [
         var newAcquiredSkillIds = angular.copy(oldAcquiredSkillIds);
         var index = newAcquiredSkillIds.indexOf(skillId);
         if (index === -1) {
-          throw Error('The given acquired skill id is not part of the node');
+          throw new Error(
+            'The given acquired skill id is not part of the node');
         }
         newAcquiredSkillIds.splice(index, 1);
 
@@ -499,11 +612,11 @@ angular.module('oppia').factory('StoryUpdateService', [
           story, STORY_NODE_PROPERTY_ACQUIRED_SKILL_IDS, nodeId,
           oldAcquiredSkillIds, newAcquiredSkillIds,
           function(changeDict, story) {
-            // Apply.
+            // ---- Apply ----
             story.getStoryContents().removeAcquiredSkillIdFromNode(
               nodeId, skillId);
           }, function(changeDict, story) {
-            // Undo.
+            // ---- Undo ----
             story.getStoryContents().addAcquiredSkillIdToNode(
               nodeId, skillId);
           });

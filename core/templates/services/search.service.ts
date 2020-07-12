@@ -79,8 +79,9 @@ angular.module('oppia').factory('SearchService', [
           itemCodes.indexOf(EXPECTED_PREFIX) !== 0 ||
           itemCodes.lastIndexOf(EXPECTED_SUFFIX) !==
             itemCodes.length - EXPECTED_SUFFIX.length) {
-        throw Error('Invalid search query url fragment for ' +
-                    itemsType + ': ' + urlComponent);
+        throw new Error(
+          'Invalid search query url fragment for ' +
+          itemsType + ': ' + urlComponent);
       }
 
       var items = itemCodes.substring(
@@ -163,7 +164,7 @@ angular.module('oppia').factory('SearchService', [
         // The following will split the urlQuery into 3 components:
         // 1. query
         // 2. categories (optional)
-        // 3. language codes (default to 'en')
+        // 3. language codes (default to 'en').
         var querySegments = urlQuery.split('&');
 
         for (var i = 1; i < querySegments.length; i++) {

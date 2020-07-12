@@ -1,12 +1,28 @@
 <div role="form" class="form-horizontal">
   <md-card class="oppia-page-card oppia-long-text">
+    <div class="story-thumbnail">
+      <label class="form-heading">Story Thumbnail</label>
+      <thumbnail-uploader filename="story.getThumbnailFilename()"
+                          update-filename="updateStoryThumbnailFilename"
+                          bg-color="story.getThumbnailBgColor()"
+                          update-bg-color="updateStoryThumbnailBgColor"
+                          allowed-bg-colors="allowedBgColors"
+                          aspect-ratio="'4:3'"
+                          preview-title="editableTitle"
+                          preview-description="editableDescription"
+                          preview-description-bg-color=""
+                          preview-footer="">
+      </thumbnail-uploader>
+    </div>
     <div class="story-title">
       <label for="storyTitle" class="form-heading">Story Title</label>
       <input id="storyTitle" type="text" class="form-control protractor-test-story-title-field"
              ng-model="editableTitle" ng-blur="updateStoryTitle(editableTitle)"
-             placeholder="Enter a title for the story." maxlength="20" ng-trim="false">
-      <span class="form-text" style="font-size: smaller; color: red;" ng-if="editableTitle.length === 20">
-        <em>Please use at most 20 characters for the story title.</em>
+             placeholder="Enter a title for the story." maxlength="<[MAX_CHARS_IN_STORY_TITLE]>" ng-trim="false">
+      <span class="oppia-input-box-subtitle">
+        <i>
+          Story title should be at most <[MAX_CHARS_IN_STORY_TITLE]> characters.
+        </i>
       </span>
     </div>
 
@@ -119,7 +135,10 @@
         <div ng-repeat="node in nodes">
           <story-node-editor ng-if="node.getId() === idOfNodeToEdit"
                              node-id="node.getId()"
+                             thumbnail-filename="node.getThumbnailFilename()"
+                             thumbnail-bg-color="node.getThumbnailBgColor()"
                              outline="node.getOutline()"
+                             description="node.getDescription()"
                              exploration-id="node.getExplorationId()"
                              outline-finalized="node.getOutlineStatus()"
                              destination-node-ids="node.getDestinationNodeIds()"
@@ -162,12 +181,12 @@
     font-family: "Capriola", "Roboto", Arial, sans-serif;
     font-size: 0.8em;
     margin: 0;
-    padding-top: 5px;
     padding-bottom: 5px;
+    padding-top: 5px;
     position: relative;
     text-align: center;
-    width: 15vw;
     white-space: normal;
+    width: 15vw;
   }
 
   story-editor .selected-node {
@@ -182,13 +201,15 @@
   }
 
   story-editor .story-editor-initial-node {
-    position: absolute;
     left: 0;
+    position: absolute;
     top: 0;
   }
 
   story-editor .story-editor-node-title {
     color: blue;
+    max-height: 5em;
+    overflow-wrap: break-word;
     padding: 16px 16px 20px 16px;
   }
 
@@ -225,8 +246,8 @@
   }
 
   story-editor .story-notes {
-    margin-top: 1.5%;
     margin-bottom: 2%;
+    margin-top: 1.5%;
   }
 
   story-editor .story-nodes-title {

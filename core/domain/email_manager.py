@@ -248,7 +248,7 @@ SENDER_VALIDATORS = {
 }
 
 
-def _require_sender_id_is_valid(intent, sender_id):
+def require_sender_id_is_valid(intent, sender_id):
     """Ensure that the sender ID is valid, based on the email's intent.
 
     Many emails are only allowed to be sent by a certain user or type of user,
@@ -310,7 +310,7 @@ def _send_email(
     if sender_name is None:
         sender_name = EMAIL_SENDER_NAME.value
 
-    _require_sender_id_is_valid(intent, sender_id)
+    require_sender_id_is_valid(intent, sender_id)
 
     if recipient_email is None:
         recipient_email = user_services.get_email_from_user_id(recipient_id)
@@ -352,7 +352,7 @@ def _send_email(
 
 def _send_bulk_mail(
         recipient_ids, sender_id, intent, email_subject, email_html_body,
-        sender_email, sender_name, instance_id=None):
+        sender_email, sender_name, instance_id):
     """Sends an email to all given recipients.
 
     Args:
@@ -364,9 +364,9 @@ def _send_bulk_mail(
         sender_email: str. The sender's email address.
         sender_name: str. The name to be shown in the "sender" field of the
             email.
-        instance_id: str or None. The ID of the BulkEmailModel entity instance.
+        instance_id: str. The ID of the BulkEmailModel entity instance.
     """
-    _require_sender_id_is_valid(intent, sender_id)
+    require_sender_id_is_valid(intent, sender_id)
 
     recipients_settings = user_services.get_users_settings(recipient_ids)
     recipient_emails = [user.email for user in recipients_settings]
@@ -383,16 +383,18 @@ def _send_bulk_mail(
         '<br>', '\n').replace('<li>', '<li>- ').replace('</p><p>', '</p>\n<p>')
     cleaned_plaintext_body = html_cleaner.strip_html_tags(raw_plaintext_body)
 
-    def _send_bulk_mail_in_transaction(instance_id=None):
-        """Sends the emails in bulk to the recipients."""
+    def _send_bulk_mail_in_transaction(instance_id):
+        """Sends the emails in bulk to the recipients.
+
+        Args:
+            instance_id: str. The ID of the BulkEmailModel entity instance.
+        """
         sender_name_email = '%s <%s>' % (sender_name, sender_email)
 
         email_services.send_bulk_mail(
             sender_name_email, recipient_emails, email_subject,
             cleaned_plaintext_body, cleaned_html_body)
 
-        if instance_id is None:
-            instance_id = email_models.BulkEmailModel.get_new_id('')
         email_models.BulkEmailModel.create(
             instance_id, recipient_ids, sender_id, sender_name_email, intent,
             email_subject, cleaned_html_body, datetime.datetime.utcnow())
@@ -500,8 +502,8 @@ def get_moderator_unpublish_exploration_email():
 
     Returns:
         str. Draft of the email body for an email sent after the moderator
-            unpublishes an exploration, or an empty string if no email should
-            be sent.
+        unpublishes an exploration, or an empty string if no email should
+        be sent.
     """
 
     try:
@@ -726,7 +728,7 @@ def send_feedback_message_email(recipient_id, feedback_messages):
         'You\'ve received %s new message%s on your Oppia explorations:<br>'
         '<ul>%s</ul>'
         'You can view and reply to your messages from your '
-        '<a href="https://www.oppia.org/creator_dashboard">dashboard</a>.'
+        '<a href="https://www.oppia.org/creator-dashboard">dashboard</a>.'
         '<br>'
         '<br>Thanks, and happy teaching!<br>'
         '<br>'
@@ -1047,8 +1049,7 @@ def send_user_query_email(
     sender_email = user_services.get_email_from_user_id(sender_id)
     _send_bulk_mail(
         recipient_ids, sender_id, email_intent, email_subject, email_body,
-        sender_email, sender_name,
-        instance_id=bulk_email_model_id)
+        sender_email, sender_name, bulk_email_model_id)
     return bulk_email_model_id
 
 
@@ -1089,7 +1090,7 @@ def send_mail_to_onboard_new_reviewers(user_id, category):
         'edits made to lessons preserve the lessons\' quality and are '
         'beneficial for students.<br><br>'
         'If you\'d like to help out as a reviewer, please visit your '
-        '<a href="https://www.oppia.org/creator_dashboard/">dashboard</a>. '
+        '<a href="https://www.oppia.org/creator-dashboard/">dashboard</a>. '
         'and set your review preferences accordingly. Note that, if you accept,'
         'you will receive occasional emails inviting you to review incoming '
         'suggestions by others.<br><br>'
@@ -1134,7 +1135,7 @@ def send_mail_to_notify_users_to_review(user_id, category):
         'review in %s, which you are registered as a reviewer for.'
         '<br><br>Please take a look at and accept/reject these suggestions at'
         ' your earliest convenience. You can visit your '
-        '<a href="https://www.oppia.org/creator_dashboard/">dashboard</a> '
+        '<a href="https://www.oppia.org/creator-dashboard/">dashboard</a> '
         'to view the list of suggestions that need a review.<br><br>'
         'Thank you for helping improve Oppia\'s lessons!'
         '- The Oppia Team<br>'
@@ -1229,7 +1230,7 @@ def send_rejected_voiceover_application_email(
         ' and the reviewer has left a message.'
         '<br><br>Review message: %s<br><br>'
         'You can create a new voiceover application through the'
-        '<a href="https://oppia.org/community_dashboard">'
+        '<a href="https://oppia.org/community-dashboard">'
         'community dashboard</a> page.<br><br>'
         '- The Oppia Team<br>'
         '<br>%s')
@@ -1320,7 +1321,7 @@ def send_email_to_new_community_reviewer(
         'This is to let you know that the Oppia team has added you as a '
         'reviewer for %s. This allows you to %s.<br><br>'
         'You can check the %s waiting for review in the '
-        '<a href="https://www.oppia.org/community_dashboard">'
+        '<a href="https://www.oppia.org/community-dashboard">'
         'Community Dashboard</a>.<br><br>'
         'Thanks, and happy contributing!<br><br>'
         'Best wishes,<br>'
@@ -1382,7 +1383,7 @@ def send_email_to_removed_community_reviewer(
         'Hi %s,<br><br>'
         'The Oppia team has removed you from the %s. You won\'t be able to %s '
         'any more, but you can still contribute %s through the '
-        '<a href="https://www.oppia.org/community_dashboard">'
+        '<a href="https://www.oppia.org/community-dashboard">'
         'Community Dashboard</a>.<br><br>'
         'Thanks, and happy contributing!<br><br>'
         'Best wishes,<br>'

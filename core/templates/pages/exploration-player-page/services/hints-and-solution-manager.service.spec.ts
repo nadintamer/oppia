@@ -121,7 +121,7 @@ describe('HintsAndSolutionManager service', function() {
 
     $timeout.flush();
 
-    // displayHint hides tooltip.
+    // Function displayHint hides tooltip.
     expect(hasms.isHintTooltipOpen()).toBe(false);
     expect(hasms.isHintViewable(0)).toBe(true);
     expect(hasms.isHintViewable(1)).toBe(true);
@@ -239,7 +239,7 @@ describe('HintsAndSolutionManager service', function() {
     // were cleaned.
     expect(function() {
       $timeout.flush();
-    }).toThrow(Error('No deferred tasks to be flushed'));
+    }).toThrowError('No deferred tasks to be flushed');
     $timeout.verifyNoPendingTasks();
   });
 

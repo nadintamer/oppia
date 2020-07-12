@@ -20,6 +20,7 @@ from __future__ import absolute_import  # pylint: disable=import-only-modules
 from __future__ import unicode_literals  # pylint: disable=import-only-modules
 
 import collections
+import os
 import tempfile
 
 from core.tests import test_utils
@@ -92,6 +93,7 @@ class MemoizeTest(test_utils.GenericTestBase):
     def test_memoize_with_methods(self):
         class CallCounter(python_utils.OBJECT):
             """Counts calls made to an instance."""
+
             def __init__(self):
                 self.count = 0
 
@@ -115,6 +117,7 @@ class MemoizeTest(test_utils.GenericTestBase):
     def test_memoize_with_classmethods(self):
         class GoodCallCounter(python_utils.OBJECT):
             """Counts calls made to the class."""
+
             count = 0
 
             @classmethod
@@ -136,6 +139,7 @@ class MemoizeTest(test_utils.GenericTestBase):
         with self.assertRaisesRegexp(TypeError, 'not a Python function'):
             class BadCallCounter(python_utils.OBJECT):  # pylint: disable=unused-variable
                 """Counts calls made to the class."""
+
                 count = 0
 
                 @linter_utils.memoize
@@ -187,3 +191,43 @@ class RedirectStoutTest(test_utils.GenericTestBase):
         temp_file.close()
 
         self.assertEqual(data, 'This is a test\n')
+
+
+class ListDuplicateItemsTest(test_utils.GenericTestBase):
+    """Tests for the get_duplicates_from_list_of_strings function."""
+
+    def test_get_duplicates_from_list_of_strings_with_duplicat_strings(self):
+        strings_list = ['A', 'B', 'B', 'C', 'C', 'C']
+        duplicates = linter_utils.get_duplicates_from_list_of_strings(
+            strings_list)
+        self.assertEqual(sorted(duplicates), ['B', 'C'])
+
+    def test_get_duplicates_from_list_of_strings_without_duplicat_strings(self):
+        strings_list = ['A', 'B', 'C']
+        duplicates = linter_utils.get_duplicates_from_list_of_strings(
+            strings_list)
+        self.assertEqual(duplicates, [])
+
+
+class TempDirTest(test_utils.GenericTestBase):
+    """Tests for the temp_dir function."""
+
+    def test_directory_only_exists_within_context(self):
+        with linter_utils.temp_dir() as temp_dir_path:
+            self.assertTrue(os.path.exists(temp_dir_path))
+            self.assertTrue(os.path.isdir(temp_dir_path))
+        self.assertFalse(os.path.exists(temp_dir_path))
+
+    def test_directory_is_placed_in_specified_dir(self):
+        with linter_utils.temp_dir(parent=os.getcwd()) as temp_dir_path:
+            parent = os.path.abspath(
+                os.path.join(temp_dir_path, os.path.pardir))
+            self.assertEqual(parent, os.getcwd())
+
+    def test_directory_has_prefix_prepended(self):
+        with linter_utils.temp_dir(prefix='abc') as temp_dir_path:
+            self.assertTrue(os.path.basename(temp_dir_path).startswith('abc'))
+
+    def test_directory_has_suffix_appended(self):
+        with linter_utils.temp_dir(suffix='cba') as temp_dir_path:
+            self.assertTrue(os.path.basename(temp_dir_path).endswith('cba'))

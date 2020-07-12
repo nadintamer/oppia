@@ -16,15 +16,27 @@
  * @fileoverview Controller for the skills list viewer.
  */
 
+require('components/skill-selector/merge-skill-modal.controller.ts');
 require(
   'components/skill-selector/skill-selector.directive.ts');
 require(
+  'pages/topics-and-skills-dashboard-page/skills-list/' +
+  'assign-skill-to-topic-modal.controller.ts');
+require(
   'pages/topics-and-skills-dashboard-page/topic-selector/' +
   'topic-selector.directive.ts');
-
+require(
+  'domain/topics_and_skills_dashboard/' +
+  'topics-and-skills-dashboard-backend-api.service.ts');
 require('domain/skill/skill-backend-api.service.ts');
 require('domain/topic/editable-topic-backend-api.service.ts');
 require('domain/utilities/url-interpolation.service.ts');
+require(
+  'pages/topics-and-skills-dashboard-page/' +
+  'skills-list/assign-skill-to-topic-modal.controller.ts');
+require(
+  'pages/topics-and-skills-dashboard-page/topic-selector/' +
+  'topic-selector.directive.ts');
 require('services/alerts.service.ts');
 
 require(
@@ -39,15 +51,19 @@ angular.module('oppia').directive('skillsList', [
       restrict: 'E',
       scope: {
         getSkillSummaries: '&skillSummaries',
+        getPageNumber: '&pageNumber',
+        getItemsPerPage: '&itemsPerPage',
         getEditableTopicSummaries: '&editableTopicSummaries',
         getMergeableSkillSummaries: '&mergeableSkillSummaries',
         canDeleteSkill: '&userCanDeleteSkill',
         canCreateSkill: '&userCanCreateSkill',
-        isUnpublishedSkill: '&unpublishedSkill'
+        isUnpublishedSkill: '&unpublishedSkill',
+        getSkillsCategorizedByTopics: '&skillsCategorizedByTopics'
       },
       templateUrl: UrlInterpolationService.getDirectiveTemplateUrl(
         '/pages/topics-and-skills-dashboard-page/skills-list/' +
         'skills-list.directive.html'),
+      controllerAs: '$ctrl',
       controller: [
         '$scope', '$uibModal', '$rootScope', '$timeout',
         'EditableTopicBackendApiService', 'SkillBackendApiService',
@@ -59,82 +75,61 @@ angular.module('oppia').directive('skillsList', [
             TopicsAndSkillsDashboardBackendApiService,
             EVENT_TOPICS_AND_SKILLS_DASHBOARD_REINITIALIZED) {
           var ctrl = this;
-          $scope.highlightColumns = function(index) {
-            $scope.highlightedIndex = index;
+
+          ctrl.getSkillEditorUrl = function(skillId) {
+            var SKILL_EDITOR_URL_TEMPLATE = '/skill_editor/<skill_id>';
+            return UrlInterpolationService.interpolateUrl(
+              SKILL_EDITOR_URL_TEMPLATE, {
+                skill_id: skillId
+              });
           };
 
-          $scope.unhighlightColumns = function() {
-            $scope.highlightedIndex = null;
-          };
-
-          $scope.getSkillEditorUrl = function(skillId) {
-            return '/skill_editor/' + skillId;
-          };
-
-          $scope.deleteSkill = function(skillId) {
-            var modalInstance = $uibModal.open({
+          ctrl.deleteSkill = function(skillId) {
+            $uibModal.open({
               templateUrl: UrlInterpolationService.getDirectiveTemplateUrl(
                 '/pages/topics-and-skills-dashboard-page/templates/' +
                 'delete-skill-modal.template.html'),
               backdrop: true,
-              controller: [
-                '$scope', '$uibModalInstance',
-                function($scope, $uibModalInstance) {
-                  $scope.confirmDeletion = function() {
-                    $uibModalInstance.close();
-                  };
-                  $scope.cancel = function() {
-                    $uibModalInstance.dismiss('cancel');
-                  };
-                }
-              ]
-            });
-
-            modalInstance.result.then(function() {
+              windowClass: 'delete-skill-modal',
+              controller: 'ConfirmOrCancelModalController'
+            }).result.then(function() {
               SkillBackendApiService.deleteSkill(skillId).then(
                 function(status) {
                   $timeout(function() {
                     $rootScope.$broadcast(
                       EVENT_TOPICS_AND_SKILLS_DASHBOARD_REINITIALIZED);
+                    var successToast = 'The skill has been deleted.';
+                    AlertsService.addSuccessMessage(successToast, 1000);
                   }, 100);
                 }
               );
+            }, function() {
+              // Note to developers:
+              // This callback is triggered when the Cancel button is clicked.
+              // No further action is needed.
             }).then(function() {
-              var successToast = 'The skill has been deleted.';
-              AlertsService.addSuccessMessage(successToast, 1000);
             });
           };
 
-          $scope.assignSkillToTopic = function(skillId) {
+          ctrl.assignSkillToTopic = function(skillId) {
             var topicSummaries = $scope.getEditableTopicSummaries();
-            var modalInstance = $uibModal.open({
+            $uibModal.open({
               templateUrl: UrlInterpolationService.getDirectiveTemplateUrl(
                 '/pages/topics-and-skills-dashboard-page/templates/' +
                 'assign-skill-to-topic-modal.template.html'),
               backdrop: true,
-              controller: [
-                '$scope', '$uibModalInstance',
-                function($scope, $uibModalInstance) {
-                  $scope.topicSummaries = topicSummaries;
-                  $scope.selectedTopicIds = [];
-                  $scope.done = function() {
-                    $uibModalInstance.close($scope.selectedTopicIds);
-                  };
-                  $scope.cancel = function() {
-                    $uibModalInstance.dismiss('cancel');
-                  };
-                }
-              ]
-            });
-
-            modalInstance.result.then(function(topicIds) {
+              windowClass: 'assign-skill-to-topic-modal',
+              resolve: {
+                topicSummaries: () => topicSummaries
+              },
+              controller: 'AssignSkillToTopicModalController'
+            }).result.then(function(topicIds) {
               var changeList = [{
                 cmd: 'add_uncategorized_skill_id',
                 new_uncategorized_skill_id: skillId
               }];
               var topicSummaries = $scope.getEditableTopicSummaries();
               for (var i = 0; i < topicIds.length; i++) {
-                var version = null;
                 for (var j = 0; j < topicSummaries.length; j++) {
                   if (topicSummaries[j].id === topicIds[i]) {
                     EditableTopicBackendApiService.updateTopic(
@@ -144,7 +139,8 @@ angular.module('oppia').directive('skillsList', [
                     ).then(function() {
                       $timeout(function() {
                         $rootScope.$broadcast(
-                          EVENT_TOPICS_AND_SKILLS_DASHBOARD_REINITIALIZED);
+                          EVENT_TOPICS_AND_SKILLS_DASHBOARD_REINITIALIZED,
+                          true);
                       }, 100);
                     }).then(function() {
                       var successToast = (
@@ -161,31 +157,25 @@ angular.module('oppia').directive('skillsList', [
             });
           };
 
-          $scope.mergeSkill = function(skill) {
+          ctrl.mergeSkill = function(skill) {
             var skillSummaries = $scope.getMergeableSkillSummaries();
-            var modalInstance = $uibModal.open({
+            var categorizedSkills = $scope.getSkillsCategorizedByTopics();
+            var allowSkillsFromOtherTopics = true;
+            $uibModal.open({
               templateUrl: UrlInterpolationService.getDirectiveTemplateUrl(
                 '/components/skill-selector/select-skill-modal.template.html'),
               backdrop: true,
-              controller: [
-                '$scope', '$uibModalInstance',
-                function($scope, $uibModalInstance) {
-                  $scope.skillSummaries = skillSummaries;
-                  $scope.selectedSkillId = '';
-                  $scope.save = function() {
-                    $uibModalInstance.close(
-                      {skill: skill,
-                        supersedingSkillId: $scope.selectedSkillId
-                      });
-                  };
-                  $scope.cancel = function() {
-                    $uibModalInstance.dismiss('cancel');
-                  };
-                }
-              ]
-            });
+              resolve: {
+                skill: () => skill,
+                skillSummaries: () => skillSummaries,
+                categorizedSkills: () => categorizedSkills,
+                allowSkillsFromOtherTopics: () => allowSkillsFromOtherTopics
+              },
+              controller: 'MergeSkillModalController',
+              windowClass: 'skill-select-modal',
+              size: 'xl'
 
-            modalInstance.result.then(function(result) {
+            }).result.then(function(result) {
               var skill = result.skill;
               var supersedingSkillId = result.supersedingSkillId;
               // Transfer questions from the old skill to the new skill.
@@ -209,11 +199,26 @@ angular.module('oppia').directive('skillsList', [
             });
           };
 
+          ctrl.getSerialNumberForSkill = function(skillIndex) {
+            var skillSerialNumber = (
+              skillIndex + (ctrl.getPageNumber() * ctrl.getItemsPerPage()));
+            return (skillSerialNumber + 1);
+          };
+
+          ctrl.changeEditOptions = function(skillId) {
+            ctrl.selectedIndex = ctrl.selectedIndex ? null : skillId;
+          };
+
+          ctrl.showEditOptions = function(skillId) {
+            return ctrl.selectedIndex === skillId;
+          };
+
           ctrl.$onInit = function() {
-            $scope.SKILL_HEADINGS = [
-              'description', 'worked_examples_count', 'misconception_count'
-            ];
-            $scope.highlightedIndex = null;
+            ctrl.getPageNumber = $scope.getPageNumber;
+            ctrl.getItemsPerPage = $scope.getItemsPerPage;
+            ctrl.SKILL_HEADINGS = [
+              'index', 'description', 'worked_examples_count',
+              'misconception_count', 'status'];
           };
         }
       ]

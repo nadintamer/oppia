@@ -104,7 +104,6 @@ export class EditableExplorationBackendApiService {
       .then(response => {
         // Delete item from the ReadOnlyExplorationBackendApiService's cache
         this.readOnlyExploration.deleteExplorationFromCache(explorationId);
-
         if (successCallback) {
           successCallback({});
         }

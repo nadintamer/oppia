@@ -31,7 +31,7 @@ import { ReadOnlyExplorationResponseObjectFactory } from
 import { SubtitledHtmlObjectFactory } from
   'domain/exploration/SubtitledHtmlObjectFactory';
 
-fdescribe('Read only exploration backend API service', () => {
+describe('Read only exploration backend API service', () => {
   let readOnlyExplorationBackendApiService:
     ReadOnlyExplorationBackendApiService = null;
   let subtitledHtmlObjectFactory: SubtitledHtmlObjectFactory = null;

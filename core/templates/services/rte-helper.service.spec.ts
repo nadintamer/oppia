@@ -75,7 +75,7 @@ describe('Rte Helper Service', function() {
       backendId: 'Image',
       customizationArgSpecs: [{
         name: 'filepath',
-        description: 'The image (Allowed extensions: gif, jpeg, jpg, png)',
+        description: 'The image (Allowed extensions: gif, jpeg, jpg, png, svg)',
         schema: {
           type: 'custom',
           obj_type: 'Filepath'
@@ -140,13 +140,16 @@ describe('Rte Helper Service', function() {
     }, {
       backendId: 'Math',
       customizationArgSpecs: [{
-        name: 'raw_latex',
-        description: 'The raw string to be displayed as LaTeX.',
+        name: 'math_content',
+        description: 'The Math Expression to be displayed.',
         schema: {
           type: 'custom',
-          obj_type: 'MathLatexString'
+          obj_type: 'MathExpressionContent'
         },
-        default_value: ''
+        default_value: {
+          raw_latex: '',
+          svg_filename: ''
+        }
       }],
       id: 'math',
       iconDataUrl: '/rich_text_components/Math/Math.png',
@@ -159,11 +162,11 @@ describe('Rte Helper Service', function() {
       backendId: 'skillreview',
       customizationArgSpecs: [{
         name: 'text',
-        description: 'The link to be displayed',
+        description: 'The text to be displayed',
         schema: {
           type: 'unicode'
         },
-        default_value: ''
+        default_value: 'concept card'
       }, {
         name: 'skill_id',
         description: 'The skill that this link refers to',

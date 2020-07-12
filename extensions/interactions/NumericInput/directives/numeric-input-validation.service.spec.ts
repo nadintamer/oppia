@@ -58,7 +58,7 @@ describe('NumericInputValidationService', () => {
     goodDefaultOutcome = oof.createFromBackendDict({
       dest: 'Second State',
       feedback: {
-        audio_translations: {},
+        content_id: '',
         html: ''
       },
       labelled_as_correct: false,
@@ -88,7 +88,7 @@ describe('NumericInputValidationService', () => {
     answerGroups = [agof.createNew(
       [equalsZeroRule, betweenNegativeOneAndOneRule],
       goodDefaultOutcome,
-      false,
+      null,
       null
     )];
   });
@@ -145,4 +145,34 @@ describe('NumericInputValidationService', () => {
           'because it is made redundant by rule 1 from answer group 1.'
       }]);
     });
+
+  it('should generate errors in the given input', () => {
+    expect(validatorService.getErrorString('3.')).toEqual(
+      'Trailing decimals are not allowed.');
+    expect(validatorService.getErrorString('.3.4')).toEqual(
+      'At most 1 decimal point should be present.');
+    expect(validatorService.getErrorString('36a4')).toEqual(
+      'Only use numbers, minus sign (-), and decimal (.).');
+    expect(validatorService.getErrorString('3-4')).toEqual(
+      'Minus (-) sign is only allowed in beginning.');
+    expect(validatorService.getErrorString('-3-4')).toEqual(
+      'At most 1 minus (-) sign should be present.');
+    expect(validatorService.getErrorString('2.2')).toEqual(undefined);
+    expect(validatorService.getErrorString('-2.2')).toEqual(undefined);
+    expect(validatorService.getErrorString('34.56')).toEqual(undefined);
+  });
+
+  it('should validate floats correctly', () => {
+    let filter = validatorService.parseValue;
+    expect(filter('1.23')).toEqual(1.23);
+    expect(filter('-1.23')).toEqual(-1.23);
+    expect(filter('0')).toEqual(0);
+    expect(filter('-1')).toEqual(-1);
+    expect(filter('-1.0')).toEqual(-1);
+    expect(filter('.35')).toEqual(0.35);
+    expect(filter('.3')).toEqual(0.3);
+    expect(filter('0.')).toEqual(0);
+    expect(filter('1,23,000')).toEqual(123000);
+    expect(filter('     7,00,00,000  ')).toEqual(70000000);
+  });
 });

@@ -31,11 +31,15 @@ angular.module('oppia').directive('activityTilesInfinityGrid', [
         'activity-tiles-infinity-grid.directive.html'),
       controllerAs: '$ctrl',
       controller: [
-        '$scope', '$rootScope', 'SearchService', 'WindowDimensionsService',
-        function($scope, $rootScope, SearchService, WindowDimensionsService) {
+        '$scope', 'LoaderService', 'SearchService',
+        'WindowDimensionsService',
+        function($scope, LoaderService, SearchService,
+            WindowDimensionsService) {
           var ctrl = this;
+          ctrl.loadingMessage = '';
+          ctrl.subscriptions = [];
           ctrl.showMoreActivities = function() {
-            if (!$rootScope.loadingMessage && !ctrl.endOfPageIsReached) {
+            if (!ctrl.loadingMessage && !ctrl.endOfPageIsReached) {
               ctrl.searchResultsAreLoading = true;
               SearchService.loadMoreData(function(data, endOfPageIsReached) {
                 ctrl.allActivitiesInOrder =
@@ -50,6 +54,8 @@ angular.module('oppia').directive('activityTilesInfinityGrid', [
             }
           };
           ctrl.$onInit = function() {
+            ctrl.subscriptions.push(LoaderService.onLoadingMessageChange
+              .subscribe((message: string) => this.loadingMessage = message));
             // Called when the first batch of search results is retrieved from
             // the server.
             $scope.$on(
@@ -64,11 +70,22 @@ angular.module('oppia').directive('activityTilesInfinityGrid', [
             ctrl.libraryWindowIsNarrow = (
               WindowDimensionsService.getWidth() <= libraryWindowCutoffPx);
 
-            WindowDimensionsService.registerOnResizeHook(function() {
-              ctrl.libraryWindowIsNarrow = (
-                WindowDimensionsService.getWidth() <= libraryWindowCutoffPx);
-              $scope.$apply();
-            });
+            ctrl.resizeSubscription = WindowDimensionsService.getResizeEvent().
+              subscribe(evt => {
+                ctrl.libraryWindowIsNarrow = (
+                  WindowDimensionsService.getWidth() <= libraryWindowCutoffPx);
+                $scope.$applyAsync();
+              });
+          };
+
+          ctrl.$onDestroy = function() {
+            if (ctrl.resizeSubscription) {
+              ctrl.resizeSubscription.unsubscribe();
+            }
+
+            for (let subscription of ctrl.subscriptions) {
+              subscription.unsubscribe();
+            }
           };
         }
       ]

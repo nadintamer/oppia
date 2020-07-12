@@ -37,7 +37,7 @@ class ClassifierTrainingJobModel(base_models.BaseModel):
     """Model for storing classifier training jobs.
 
     The id of instances of this class has the form
-    {{exp_id}}.{{random_hash_of_12_chars}}
+    '[exp_id].[random hash of 12 chars]'.
     """
 
     # The ID of the algorithm used to create the model.
@@ -77,15 +77,10 @@ class ClassifierTrainingJobModel(base_models.BaseModel):
         """Model does not contain user data."""
         return base_models.EXPORT_POLICY.NOT_APPLICABLE
 
-    @staticmethod
-    def get_user_id_migration_policy():
-        """ClassifierTrainingJobModel doesn't have any field with user ID."""
-        return base_models.USER_ID_MIGRATION_POLICY.NOT_APPLICABLE
-
     @classmethod
     def _generate_id(cls, exp_id):
         """Generates a unique id for the training job of the form
-        {{exp_id}}.{{random_hash_of_16_chars}}
+        '[exp_id].[random hash of 16 chars]'.
 
         Args:
             exp_id: str. ID of the exploration.
@@ -95,7 +90,7 @@ class ClassifierTrainingJobModel(base_models.BaseModel):
 
         Raises:
             Exception: The id generator for ClassifierTrainingJobModel is
-            producing too many collisions.
+                producing too many collisions.
         """
 
         for _ in python_utils.RANGE(base_models.MAX_RETRIES):
@@ -164,6 +159,7 @@ class ClassifierTrainingJobModel(base_models.BaseModel):
         Args:
             cursor: str or None. The list of returned entities starts from this
                 datastore cursor.
+
         Returns:
             List of the ClassifierTrainingJobModels with status new or pending.
         """
@@ -211,8 +207,8 @@ class ClassifierTrainingJobModel(base_models.BaseModel):
 class TrainingJobExplorationMappingModel(base_models.BaseModel):
     """Model for mapping exploration attributes to a ClassifierTrainingJob.
 
-    The id of instances of this class has the form
-    {{exp_id}}.{{exp_version}}.{{utf8_encoded_state_name}}
+    The ID of instances of this class has the form
+    [exp_id].[exp_version].[state_name].
     """
 
     # The exploration_id of the exploration to whose state the model belongs.
@@ -235,17 +231,10 @@ class TrainingJobExplorationMappingModel(base_models.BaseModel):
         """Model does not contain user data."""
         return base_models.EXPORT_POLICY.NOT_APPLICABLE
 
-    @staticmethod
-    def get_user_id_migration_policy():
-        """TrainingJobExplorationMappingModel doesn't have any field with
-        user ID.
-        """
-        return base_models.USER_ID_MIGRATION_POLICY.NOT_APPLICABLE
-
     @classmethod
     def _generate_id(cls, exp_id, exp_version, state_name):
         """Generates a unique ID for the Classifier Exploration Mapping of the
-        form {{exp_id}}.{{exp_version}}.{{utf8_encoded_state_name}}
+        form [exp_id].[exp_version].[state_name].
 
         Args:
             exp_id: str. ID of the exploration.
@@ -274,7 +263,7 @@ class TrainingJobExplorationMappingModel(base_models.BaseModel):
 
         Returns:
             list(ClassifierExplorationMappingModel|None). The model instances
-                for the classifier exploration mapping.
+            for the classifier exploration mapping.
         """
         mapping_ids = []
         for state_name in state_names:

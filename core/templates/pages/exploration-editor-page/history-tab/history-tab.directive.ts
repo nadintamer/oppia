@@ -20,6 +20,9 @@ require('components/profile-link-directives/profile-link-text.directive.ts');
 require(
   'components/version-diff-visualization/' +
   'version-diff-visualization.directive.ts');
+require(
+  'pages/exploration-editor-page/history-tab/modal-templates/' +
+  'revert-exploration-modal.controller.ts');
 
 require('domain/utilities/url-interpolation.service.ts');
 require('pages/exploration-editor-page/services/exploration-data.service.ts');
@@ -43,22 +46,22 @@ angular.module('oppia').directive('historyTab', [
         'history-tab.directive.html'),
       controllerAs: '$ctrl',
       controller: [
-        '$http', '$log', '$rootScope', '$scope',
+        '$http', '$log', '$scope', 'LoaderService',
         '$uibModal', '$window', 'CompareVersionsService',
         'DateTimeFormatService', 'EditabilityService', 'ExplorationDataService',
         'UrlInterpolationService', 'VersionTreeService',
         function(
-            $http, $log, $rootScope, $scope,
+            $http, $log, $scope, LoaderService,
             $uibModal, $window, CompareVersionsService,
             DateTimeFormatService, EditabilityService, ExplorationDataService,
             UrlInterpolationService, VersionTreeService) {
           var ctrl = this;
-          // explorationSnapshots is a list of all snapshots for the
+          // Variable explorationSnapshots is a list of all snapshots for the
           // exploration in ascending order.
           var explorationSnapshots = null;
           var versionTreeParents = null;
-          // nodesData is an object whose keys are nodeIds (assigned in version
-          // comparison), and whose values are an object containing
+          // Variable nodesData is an object whose keys are nodeIds (assigned in
+          // version comparison), and whose values are an object containing
           // 'newestStateName', 'originalStateName' and 'stateProperty'.
           var nodesData = null;
           var currentPage = 0;
@@ -102,16 +105,14 @@ angular.module('oppia').directive('historyTab', [
 
           // Refreshes the displayed version history log.
           ctrl.refreshVersionHistory = function() {
-            $rootScope.loadingMessage = 'Loading';
+            LoaderService.showLoadingScreen('Loading');
             ExplorationDataService.getData().then(function(data) {
               var currentVersion = data.version;
               ctrl.currentVersion = currentVersion;
-              /**
-               * ctrl.compareVersionMetadata is an object with keys
-               * 'earlierVersion' and 'laterVersion' whose values are the
-               * metadata of the compared versions, containing 'committerId',
-               * 'createdOnMsecs', 'commitMessage', and 'versionNumber'.
-               */
+              // The ctrl.compareVersionMetadata is an object with keys
+              // 'earlierVersion' and 'laterVersion' whose values are the
+              // metadata of the compared versions, containing 'committerId',
+              // 'createdOnMsecs', 'commitMessage', and 'versionNumber'.
               ctrl.compareVersions = {};
               ctrl.compareVersionMetadata = {};
 
@@ -156,7 +157,7 @@ angular.module('oppia').directive('historyTab', [
                       selected: false
                     });
                   }
-                  $rootScope.loadingMessage = '';
+                  LoaderService.hideLoadingScreen();
                   ctrl.computeVersionsToDisplay();
                 });
             });
@@ -173,7 +174,7 @@ angular.module('oppia').directive('historyTab', [
           };
 
           // Function to set compared version metadata, download YAML and
-          // generate diff graph and legend when selection is changed
+          // generate diff graph and legend when selection is changed.
           ctrl.changeCompareVersion = function() {
             ctrl.diffData = null;
 
@@ -202,7 +203,7 @@ angular.module('oppia').directive('historyTab', [
             );
           };
 
-          // Check if valid versions were selected
+          // Check if valid versions were selected.
           ctrl.areCompareVersionsSelected = function() {
             return (
               ctrl.compareVersions && ctrl.selectedVersionsArray.length === 2);
@@ -237,29 +238,7 @@ angular.module('oppia').directive('historyTab', [
                   return version;
                 }
               },
-              controller: [
-                '$scope', '$uibModalInstance', 'version',
-                'ExplorationDataService',
-                function(
-                    $scope, $uibModalInstance, version,
-                    ExplorationDataService) {
-                  $scope.version = version;
-
-                  $scope.getExplorationUrl = function(version) {
-                    return (
-                      '/explore/' + ExplorationDataService.explorationId +
-                      '?v=' + version);
-                  };
-
-                  $scope.revert = function() {
-                    $uibModalInstance.close(version);
-                  };
-
-                  $scope.cancel = function() {
-                    $uibModalInstance.dismiss('cancel');
-                  };
-                }
-              ]
+              controller: 'RevertExplorationModalController'
             }).result.then(function(version) {
               $http.post(ctrl.revertExplorationUrl, {
                 current_version: ExplorationDataService.data.version,
@@ -267,6 +246,10 @@ angular.module('oppia').directive('historyTab', [
               }).then(function() {
                 $window.location.reload();
               });
+            }, function() {
+              // Note to developers:
+              // This callback is triggered when the Cancel button is clicked.
+              // No further action is needed.
             });
           };
 
@@ -283,7 +266,7 @@ angular.module('oppia').directive('historyTab', [
           };
           ctrl.$onInit = function() {
             $scope.$on('refreshVersionHistory', function(evt, data) {
-              // Uncheck all checkboxes when page is refreshed
+              // Uncheck all checkboxes when page is refreshed.
               angular.forEach(ctrl.versionCheckboxArray, function(
                   versionCheckbox) {
                 versionCheckbox.selected = false;

@@ -19,6 +19,8 @@
 import { Injectable } from '@angular/core';
 import { downgradeInjectable } from '@angular/upgrade/static';
 
+import { IGraphAnswer } from 'interactions/answer-defs';
+
 export interface IEdgeCentre {
   x: number;
   y: number;
@@ -31,10 +33,7 @@ export class GraphDetailService {
   VERTEX_RADIUS: number = 6;
   EDGE_WIDTH: number = 3;
 
-  // TODO(#7165): Replace 'any' with the exact type. This has been typed
-  // as 'any' since 'graph' is a dict with 'answer' type object which is itself
-  // typed 'any'.
-  getDirectedEdgeArrowPoints(graph: any, index: number): string {
+  getDirectedEdgeArrowPoints(graph: IGraphAnswer, index: number): string {
     var ARROW_WIDTH = 5;
     var ARROW_HEIGHT = 10;
 
@@ -67,10 +66,7 @@ export class GraphDetailService {
     return ret;
   }
 
-  // TODO(#7165): Replace 'any' with the exact type. This has been typed
-  // as 'any' since 'graph' is a dict with 'answer' type object which is itself
-  // typed 'any'.
-  getEdgeCentre(graph: any, index: number): IEdgeCentre {
+  getEdgeCentre(graph: IGraphAnswer, index: number): IEdgeCentre {
     var edge = graph.edges[index];
     var srcVertex = graph.vertices[edge.src];
     var dstVertex = graph.vertices[edge.dst];

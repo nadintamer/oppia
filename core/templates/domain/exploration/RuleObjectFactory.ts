@@ -20,21 +20,22 @@
 import { downgradeInjectable } from '@angular/upgrade/static';
 import { Injectable } from '@angular/core';
 
+import { IInteractionRuleInputs } from 'interactions/rule-input-defs';
+
 export interface IBackendRuleDict {
-  inputs: IRuleInput,
-  'rule_type': string
+  'inputs': IRuleInputs;
+  'rule_type': string;
 }
-// The rule inputs are dependent on the 'type' of rule
-// that's why 'any' is used here
-export interface IRuleInput {
-  [propName: string]: any;
+
+export interface IRuleInputs {
+  [propName: string]: IInteractionRuleInputs;
 }
 
 export class Rule {
   type: string;
-  inputs: IRuleInput;
+  inputs: IRuleInputs;
 
-  constructor(type: string, inputs: IRuleInput) {
+  constructor(type: string, inputs: IRuleInputs) {
     this.type = type;
     this.inputs = inputs;
   }
@@ -50,7 +51,7 @@ export class Rule {
   providedIn: 'root'
 })
 export class RuleObjectFactory {
-  createNew(type: string, inputs: IRuleInput): Rule {
+  createNew(type: string, inputs: IRuleInputs): Rule {
     return new Rule(type, inputs);
   }
 

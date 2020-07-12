@@ -23,15 +23,13 @@ export interface IRecordedVoiceOverBackendDict {
     }
   }
 }
-export interface IVoice {
-  filename: string;
-  fileSizeBytes: number;
-  needsUpdate: boolean;
-}
+
 export interface IVoiceoverMapping {
-  [propName: string]: {
-    [propName: string]: Voiceover
-  }
+  [propName: string]: IBindableVoiceovers;
+}
+
+export interface IBindableVoiceovers {
+  [propName: string]: Voiceover;
 }
 
 import { downgradeInjectable } from '@angular/upgrade/static';
@@ -53,11 +51,11 @@ export class RecordedVoiceovers {
     return Object.keys(this.voiceoversMapping);
   }
 
-  getBindableVoiceovers(contentId: string): {[propName: string]: IVoice} {
+  getBindableVoiceovers(contentId: string): IBindableVoiceovers {
     return this.voiceoversMapping[contentId];
   }
 
-  getVoiceover(contentId: string, langCode: string): IVoice {
+  getVoiceover(contentId: string, langCode: string): Voiceover {
     return this.voiceoversMapping[contentId][langCode];
   }
 
@@ -88,14 +86,14 @@ export class RecordedVoiceovers {
 
   addContentId(contentId: string): void {
     if (this.voiceoversMapping.hasOwnProperty(contentId)) {
-      throw Error('Trying to add duplicate content id.');
+      throw new Error('Trying to add duplicate content id.');
     }
     this.voiceoversMapping[contentId] = {};
   }
 
   deleteContentId(contentId: string): void {
     if (!this.voiceoversMapping.hasOwnProperty(contentId)) {
-      throw Error('Unable to find the given content id.');
+      throw new Error('Unable to find the given content id.');
     }
     delete this.voiceoversMapping[contentId];
   }
@@ -105,7 +103,7 @@ export class RecordedVoiceovers {
       fileSizeBytes: number, durationSecs: number): void {
     var languageCodeToVoiceover = this.voiceoversMapping[contentId];
     if (languageCodeToVoiceover.hasOwnProperty(languageCode)) {
-      throw Error('Trying to add duplicate language code.');
+      throw new Error('Trying to add duplicate language code.');
     }
     languageCodeToVoiceover[languageCode] =
       this._voiceoverObjectFactory.createNew(filename,
@@ -115,7 +113,7 @@ export class RecordedVoiceovers {
   deleteVoiceover(contentId: string, languageCode: string): void {
     var languageCodeToVoiceover = this.voiceoversMapping[contentId];
     if (!languageCodeToVoiceover.hasOwnProperty(languageCode)) {
-      throw Error(
+      throw new Error(
         'Trying to remove non-existing translation for language code ' +
         languageCode);
     }

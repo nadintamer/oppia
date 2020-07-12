@@ -29,7 +29,8 @@ export class AppConstants {
     I18N_LIBRARY_LANGUAGES_EN: 'English',
     I18N_LIBRARY_ALL_CATEGORIES: 'All Categories',
     I18N_TOPNAV_SIGN_IN: 'Sign in',
-    I18N_SPLASH_PAGE_TITLE: 'Oppia: Teach, Learn, Explore',
+    I18N_SPLASH_PAGE_TITLE: 'Oppia | Free, Online and Interactive Lessons for' +
+      ' Anyone',
     I18N_SIGNUP_REGISTRATION: 'Registration',
     I18N_SIGNUP_LOADING: 'Loading'
   };
@@ -121,9 +122,11 @@ export class AppConstants {
     EXPLANATION: 'worked_example_explanation'
   };
 
-  public static ACTION_TYPE_EXPLORATION_START = 'ExplorationStart';
-  public static ACTION_TYPE_ANSWER_SUBMIT = 'AnswerSubmit';
-  public static ACTION_TYPE_EXPLORATION_QUIT = 'ExplorationQuit';
+  public static ACTION_TYPE_EXPLORATION_START: 'ExplorationStart' =
+    'ExplorationStart';
+  public static ACTION_TYPE_ANSWER_SUBMIT: 'AnswerSubmit' = 'AnswerSubmit';
+  public static ACTION_TYPE_EXPLORATION_QUIT: 'ExplorationQuit'
+    = 'ExplorationQuit';
 
   public static ISSUE_TYPE_EARLY_QUIT = 'EarlyQuit';
   public static ISSUE_TYPE_MULTIPLE_INCORRECT_SUBMISSIONS =
@@ -139,7 +142,7 @@ export class AppConstants {
 
   public static SITE_NAME = 'Oppia.org';
 
-  public static DEFAULT_PROFILE_IMAGE_PATH = '/avatar/user_blue_72px.png';
+  public static DEFAULT_PROFILE_IMAGE_PATH = '/avatar/user_blue_72px.webp';
 
   public static LOGOUT_URL = '/logout';
 
@@ -164,11 +167,12 @@ export class AppConstants {
     TOPIC: 'topic',
     SKILL: 'skill',
     STORY: 'story',
-    SUBTOPIC: 'subtopic',
     QUESTION: 'question'
   };
 
-  public static MISCONCEPTION_NAME_CHAR_LIMIT = 100;
+  public static IMAGE_SAVE_DESTINATION_SERVER = 'imageSaveDestinationServer';
+  public static IMAGE_SAVE_DESTINATION_LOCAL_STORAGE =
+    'imageSaveDestinationLocalStorage';
 }
 
 const constants = require('constants.ts');

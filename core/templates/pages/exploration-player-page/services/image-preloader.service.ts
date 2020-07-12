@@ -36,8 +36,8 @@ angular.module('oppia').factory('ImagePreloaderService', [
     var _exploration = null;
     var _states = null;
     var _hasImagePreloaderServiceStarted = false;
-    // imageLoadedCallback is an object of objects (identified by the filenames
-    // which are being downloaded at the time they are required by the
+    // Variable imageLoadedCallback is an object of objects (identified by the
+    // filenames which are being downloaded at the time they are required by the
     // directive).The object contains the resolve method of the promise
     // attached with getInImageUrl method.
     var _imageLoadedCallback = {};
@@ -239,7 +239,7 @@ angular.module('oppia').factory('ImagePreloaderService', [
     */
     var getDimensionsOfImage = function(filename) {
       var dimensionsRegex = RegExp(
-        '[^/]+_height_([0-9]+)_width_([0-9]+)\.(png|jpeg|jpg|gif)$', 'g');
+        '[^/]+_height_([0-9]+)_width_([0-9]+)\.(png|jpeg|jpg|gif|svg)$', 'g');
       var imageDimensions = dimensionsRegex.exec(filename);
       if (imageDimensions) {
         var dimensions = {

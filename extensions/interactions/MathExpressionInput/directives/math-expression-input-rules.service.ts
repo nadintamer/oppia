@@ -19,18 +19,20 @@
 import { Injectable } from '@angular/core';
 import { downgradeInjectable } from '@angular/upgrade/static';
 
+import { IMathExpressionAnswer } from 'interactions/answer-defs';
+import { IMathExpressionRuleInputs } from 'interactions/rule-input-defs';
+
 @Injectable({
   providedIn: 'root'
 })
 export class MathExpressionInputRulesService {
-  // TODO(#7165): Replace 'any' with the exact type. This has been typed
-  // as 'any' since 'answer' is a complex object having varying types. A general
-  // type needs to be found. Same goes for 'inputs'.
-  IsMathematicallyEquivalentTo(answer: any, inputs: any): boolean | Error {
+  IsMathematicallyEquivalentTo(
+      answer: IMathExpressionAnswer,
+      inputs: IMathExpressionRuleInputs): boolean | Error {
     try {
       MathExpression.fromLatex(answer.latex);
     } catch (e) {
-      throw Error(
+      throw new Error(
         'Bad expression in answer.latex: ' + e.message + ' inputs: ' +
         JSON.stringify(answer));
     }
@@ -38,7 +40,7 @@ export class MathExpressionInputRulesService {
     try {
       MathExpression.fromLatex(inputs.x);
     } catch (e) {
-      throw Error(
+      throw new Error(
         'Bad expression in inputs.x: ' + e.message + ' inputs: ' +
         JSON.stringify(inputs));
     }

@@ -319,7 +319,7 @@ describe('Exploration data service', function() {
       draft_changes: ''
     };
 
-    // data.exploration won't receive a value.
+    // The data.exploration won't receive a value.
     $httpBackend.expect('GET', '/createhandler/data/0?apply_draft=true')
       .respond(500);
     eds.getData(errorCallback).then(function() {
@@ -406,6 +406,6 @@ describe('Exploration data service', function() {
     var errorCallback = jasmine.createSpy('error');
     expect(function() {
       eds.getData(errorCallback);
-    }).toThrow(TypeError('eds.getData is not a function'));
+    }).toThrowError('eds.getData is not a function');
   });
 });

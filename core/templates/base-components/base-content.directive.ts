@@ -16,10 +16,11 @@
  * @fileoverview Directive for the Base Transclusion Component.
  */
 
-require('base-components/warning-loader.directive.ts');
+require('base-components/loading-message.component.ts');
+require('base-components/warnings-and-alerts.directive.ts');
 require('pages/OppiaFooterDirective.ts');
 
-require('domain/sidebar/sidebar-status.service.ts');
+require('services/bottom-navbar-status.service.ts');
 require('services/contextual/url.service.ts');
 require('services/stateful/background-mask.service.ts');
 
@@ -28,19 +29,25 @@ angular.module('oppia').directive('baseContent', [
     return {
       restrict: 'E',
       scope: {},
-      bindToController: {},
+      bindToController: {
+        backButtonShown: '<'
+      },
       transclude: {
         breadcrumb: '?navbarBreadcrumb',
+        preLogoAction: '?navbarPreLogoAction',
         content: 'content',
         footer: '?pageFooter',
         navOptions: '?navOptions',
+        mobileNavOptions: '?mobileNavOptions',
       },
       template: require('./base-content.directive.html'),
       controllerAs: '$ctrl',
       controller: ['$rootScope', '$window', 'BackgroundMaskService',
-        'SidebarStatusService', 'UrlService',
+        'BottomNavbarStatusService', 'SidebarStatusService', 'LoaderService',
+        'UrlService',
         function($rootScope, $window, BackgroundMaskService,
-            SidebarStatusService, UrlService) {
+            BottomNavbarStatusService, SidebarStatusService, LoaderService,
+            UrlService) {
           // Mimic redirection behaviour in the backend (see issue #7867 for
           // details).
           if ($window.location.hostname === 'oppiaserver.appspot.com') {
@@ -52,8 +59,13 @@ angular.module('oppia').directive('baseContent', [
           }
 
           var ctrl = this;
+          ctrl.loadingMessage = '';
+          ctrl.mobileNavOptionsAreShown = false;
           ctrl.isSidebarShown = () => SidebarStatusService.isSidebarShown();
           ctrl.closeSidebarOnSwipe = () => SidebarStatusService.closeSidebar();
+          ctrl.toggleMobileNavOptions = () => {
+            ctrl.mobileNavOptionsAreShown = !ctrl.mobileNavOptionsAreShown;
+          };
           ctrl.isBackgroundMaskActive = () => (
             BackgroundMaskService.isMaskActive());
           ctrl.skipToMainContent = function() {
@@ -61,7 +73,7 @@ angular.module('oppia').directive('baseContent', [
               'oppia-main-content');
 
             if (!mainContentElement) {
-              throw Error('Variable mainContentElement is undefined.');
+              throw new Error('Variable mainContentElement is undefined.');
             }
             mainContentElement.tabIndex = -1;
             mainContentElement.scrollIntoView();
@@ -69,7 +81,15 @@ angular.module('oppia').directive('baseContent', [
           };
           ctrl.$onInit = function() {
             ctrl.iframed = UrlService.isIframed();
+
+            ctrl.isBottomNavbarShown = () => {
+              return BottomNavbarStatusService.isBottomNavbarEnabled();
+            };
+
             ctrl.DEV_MODE = $rootScope.DEV_MODE;
+            LoaderService.onLoadingMessageChange.subscribe(
+              (message: string) => this.loadingMessage = message
+            );
           };
         }
       ]

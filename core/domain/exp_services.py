@@ -43,6 +43,7 @@ from core.domain import exp_domain
 from core.domain import exp_fetchers
 from core.domain import fs_domain
 from core.domain import html_cleaner
+from core.domain import html_validation_service
 from core.domain import opportunity_services
 from core.domain import param_domain
 from core.domain import rights_manager
@@ -215,8 +216,8 @@ def get_recently_published_exp_summaries(limit):
 
     Returns:
         dict. The dict contains recently published ExplorationSummary model
-            instances as a value keyed by their exploration id. At most 'limit'
-            entries are returned.
+        instances as a value keyed by their exploration id. At most 'limit'
+        entries are returned.
     """
     return exp_fetchers.get_exploration_summaries_from_models(
         exp_models.ExpSummaryModel.get_recently_published(limit))
@@ -231,7 +232,7 @@ def get_story_id_linked_to_exploration(exp_id):
 
     Returns:
         str|None. The ID of the story if the exploration is linked to some
-            story, otherwise None.
+        story, otherwise None.
     """
     exploration_context_model = exp_models.ExplorationContextModel.get_by_id(
         exp_id)
@@ -266,21 +267,27 @@ def export_to_zip_file(exploration_id, version=None):
         str. The contents of the ZIP archive of the exploration (which can be
         subsequently converted into a zip file via zipfile.ZipFile()).
     """
+    # Asset directories that need to be included in exploration download.
+    asset_dirs_to_include_in_downloads = ('image',)
     exploration = exp_fetchers.get_exploration_by_id(
         exploration_id, version=version)
     yaml_repr = exploration.to_yaml()
 
-    memfile = python_utils.string_io()
+    temp_file = python_utils.string_io()
     with zipfile.ZipFile(
-        memfile, mode='w', compression=zipfile.ZIP_DEFLATED) as zfile:
-
-        zfile.writestr('%s.yaml' % exploration.title, yaml_repr)
+        temp_file, mode='w', compression=zipfile.ZIP_DEFLATED) as zfile:
+        if not exploration.title:
+            zfile.writestr('Unpublished_exploration.yaml', yaml_repr)
+        else:
+            zfile.writestr('%s.yaml' % exploration.title, yaml_repr)
 
         fs = fs_domain.AbstractFileSystem(
             fs_domain.GcsFileSystem(
                 feconf.ENTITY_TYPE_EXPLORATION, exploration_id))
         dir_list = fs.listdir('')
         for filepath in dir_list:
+            if not filepath.startswith(asset_dirs_to_include_in_downloads):
+                continue
             file_contents = fs.get(filepath)
 
             str_filepath = 'assets/%s' % filepath
@@ -288,7 +295,7 @@ def export_to_zip_file(exploration_id, version=None):
             unicode_filepath = str_filepath.decode('utf-8')
             zfile.writestr(unicode_filepath, file_contents)
 
-    return memfile.getvalue()
+    return temp_file.getvalue()
 
 
 def export_states_to_yaml(exploration_id, version=None, width=80):
@@ -401,7 +408,11 @@ def apply_change_list(exploration_id, change_list):
                 elif (
                         change.property_name ==
                         exp_domain.STATE_PROPERTY_INTERACTION_SOLUTION):
-                    state.update_interaction_solution(change.new_value)
+                    new_solution = None
+                    if change.new_value is not None:
+                        new_solution = state_domain.Solution.from_dict(
+                            state.interaction.id, change.new_value)
+                    state.update_interaction_solution(new_solution)
                 elif (
                         change.property_name ==
                         exp_domain.STATE_PROPERTY_SOLICIT_ANSWER_DETAILS):
@@ -487,8 +498,18 @@ def apply_change_list(exploration_id, change_list):
                 # Exploration domain object automatically converts it to use
                 # the latest states schema version. As a result, simply
                 # resaving the exploration is sufficient to apply the states
-                # schema update.
-                continue
+                # schema update. Thus, no action is needed here other than
+                # to make sure that the version that the user is trying to
+                # migrate to is the latest version.
+                target_version_is_current_state_schema_version = (
+                    change.to_version ==
+                    python_utils.UNICODE(feconf.CURRENT_STATE_SCHEMA_VERSION))
+                if not target_version_is_current_state_schema_version:
+                    raise Exception(
+                        'Expected to migrate to the latest state schema '
+                        'version %s, received %s' % (
+                            feconf.CURRENT_STATE_SCHEMA_VERSION,
+                            change.to_version))
         return exploration
 
     except Exception as e:
@@ -989,34 +1010,25 @@ def compute_summary_of_exploration(exploration, contributor_id_to_add):
         old_exp_summary = exp_fetchers.get_exploration_summary_from_model(
             exp_summary_model)
         ratings = old_exp_summary.ratings or feconf.get_empty_ratings()
-        scaled_average_rating = get_scaled_average_rating(
-            old_exp_summary.ratings)
-        contributor_ids = old_exp_summary.contributor_ids or []
+        scaled_average_rating = get_scaled_average_rating(ratings)
         contributors_summary = old_exp_summary.contributors_summary or {}
     else:
         ratings = feconf.get_empty_ratings()
         scaled_average_rating = feconf.EMPTY_SCALED_AVERAGE_RATING
-        contributor_ids = []
         contributors_summary = {}
 
     # Update the contributor id list if necessary (contributors
     # defined as humans who have made a positive (i.e. not just
     # a revert) change to an exploration's content).
-    if (contributor_id_to_add is not None and
-            contributor_id_to_add not in constants.SYSTEM_USER_IDS):
-        if contributor_id_to_add not in contributor_ids:
-            contributor_ids.append(contributor_id_to_add)
 
-    if contributor_id_to_add not in constants.SYSTEM_USER_IDS:
-        if contributor_id_to_add is None:
-            # Revert commit or other non-positive commit.
-            contributors_summary = compute_exploration_contributors_summary(
-                exploration.id)
-        else:
-            if contributor_id_to_add in contributors_summary:
-                contributors_summary[contributor_id_to_add] += 1
-            else:
-                contributors_summary[contributor_id_to_add] = 1
+    if contributor_id_to_add is None:
+        # Recalculate the contributors because revert was done.
+        contributors_summary = compute_exploration_contributors_summary(
+            exploration.id)
+    elif contributor_id_to_add not in constants.SYSTEM_USER_IDS:
+        contributors_summary[contributor_id_to_add] = (
+            contributors_summary.get(contributor_id_to_add, 0) + 1)
+    contributor_ids = list(contributors_summary.keys())
 
     exploration_model_last_updated = datetime.datetime.fromtimestamp(
         python_utils.divide(
@@ -1077,33 +1089,38 @@ def save_exploration_summary(exp_summary):
     Args:
         exp_summary: ExplorationSummary. The exploration summary to save.
     """
-    exp_summary_model = exp_models.ExpSummaryModel(
-        id=exp_summary.id,
-        title=exp_summary.title,
-        category=exp_summary.category,
-        objective=exp_summary.objective,
-        language_code=exp_summary.language_code,
-        tags=exp_summary.tags,
-        ratings=exp_summary.ratings,
-        scaled_average_rating=exp_summary.scaled_average_rating,
-        status=exp_summary.status,
-        community_owned=exp_summary.community_owned,
-        owner_ids=exp_summary.owner_ids,
-        editor_ids=exp_summary.editor_ids,
-        voice_artist_ids=exp_summary.voice_artist_ids,
-        viewer_ids=exp_summary.viewer_ids,
-        contributor_ids=exp_summary.contributor_ids,
-        contributors_summary=exp_summary.contributors_summary,
-        version=exp_summary.version,
-        exploration_model_last_updated=(
+    exp_summary_dict = {
+        'title': exp_summary.title,
+        'category': exp_summary.category,
+        'objective': exp_summary.objective,
+        'language_code': exp_summary.language_code,
+        'tags': exp_summary.tags,
+        'ratings': exp_summary.ratings,
+        'scaled_average_rating': exp_summary.scaled_average_rating,
+        'status': exp_summary.status,
+        'community_owned': exp_summary.community_owned,
+        'owner_ids': exp_summary.owner_ids,
+        'editor_ids': exp_summary.editor_ids,
+        'voice_artist_ids': exp_summary.voice_artist_ids,
+        'viewer_ids': exp_summary.viewer_ids,
+        'contributor_ids': exp_summary.contributor_ids,
+        'contributors_summary': exp_summary.contributors_summary,
+        'version': exp_summary.version,
+        'exploration_model_last_updated': (
             exp_summary.exploration_model_last_updated),
-        exploration_model_created_on=(
+        'exploration_model_created_on': (
             exp_summary.exploration_model_created_on),
-        first_published_msec=(
+        'first_published_msec': (
             exp_summary.first_published_msec)
-    )
+    }
 
-    exp_summary_model.put()
+    exp_summary_model = (exp_models.ExpSummaryModel.get_by_id(exp_summary.id))
+    if exp_summary_model is not None:
+        exp_summary_model.populate(**exp_summary_dict)
+        exp_summary_model.put()
+    else:
+        exp_summary_dict['id'] = exp_summary.id
+        exp_models.ExpSummaryModel(**exp_summary_dict).put()
 
     # The index should be updated after saving the exploration
     # summary instead of after saving the exploration since the
@@ -1369,6 +1386,7 @@ def get_next_page_of_all_non_private_commits(
             - bool. indicating whether there are (likely) more results after
               this batch. If False, there are no more results; if True, there
               are probably more results.
+
     Raises:
         ValueError: The argument max_age is not datetime.timedelta or None.
     """
@@ -1381,7 +1399,7 @@ def get_next_page_of_all_non_private_commits(
             page_size, urlsafe_start_cursor, max_age=max_age))
 
     return ([exp_domain.ExplorationCommitLogEntry(
-        entry.created_on, entry.last_updated, entry.user_id, entry.username,
+        entry.created_on, entry.last_updated, entry.user_id,
         entry.exploration_id, entry.commit_type, entry.commit_message,
         entry.commit_cmds, entry.version, entry.post_commit_status,
         entry.post_commit_community_owned, entry.post_commit_is_private
@@ -1395,7 +1413,7 @@ def get_image_filenames_from_exploration(exploration):
         exploration: Exploration object. The exploration itself.
 
     Returns:
-       list(str). List containing the name of the image files in exploration.
+        list(str). List containing the name of the image files in exploration.
     """
     filenames = []
     for state in exploration.states.values():
@@ -1404,18 +1422,9 @@ def get_image_filenames_from_exploration(exploration):
                 'imageAndRegions']['value']['imagePath'])
 
     html_list = exploration.get_all_html_content_strings()
-    rte_components_in_exp = []
-    for html_string in html_list:
-        rte_components_in_exp = (
-            rte_components_in_exp + html_cleaner.get_rte_components(
-                html_string))
-
-    for rte_comp in rte_components_in_exp:
-        if 'id' in rte_comp and rte_comp['id'] == 'oppia-noninteractive-image':
-            filenames.append(
-                rte_comp['customization_args']['filepath-with-value'])
-    # This is done because the ItemSelectInput may repeat the image names.
-    return list(set(filenames))
+    filenames.extend(
+        html_cleaner.get_image_filenames_from_html_strings(html_list))
+    return filenames
 
 
 def get_number_of_ratings(ratings):
@@ -1689,12 +1698,27 @@ def get_exp_with_draft_applied(exp_id, user_id):
                 if new_draft_change_list is not None:
                     draft_change_list = new_draft_change_list
                     draft_change_list_exp_version = exploration.version
+    updated_exploration = None
 
-    return (
-        apply_change_list(exp_id, draft_change_list)
-        if exp_user_data and exp_user_data.draft_change_list and
-        is_version_of_draft_valid(exp_id, draft_change_list_exp_version)
-        else None)
+    if (exp_user_data and exp_user_data.draft_change_list and
+            is_version_of_draft_valid(exp_id, draft_change_list_exp_version)):
+        updated_exploration = apply_change_list(exp_id, draft_change_list)
+        updated_exploration_has_no_invalid_math_tags = True
+        # verify that all the math-tags are valid before returning the
+        # updated exploration.
+        for state in updated_exploration.states.values():
+            html_string = ''.join(state.get_all_html_content_strings())
+            error_list = (
+                html_validation_service.
+                validate_math_tags_in_html_with_attribute_math_content(
+                    html_string))
+            if len(error_list) > 0:
+                updated_exploration_has_no_invalid_math_tags = False
+                break
+        if not updated_exploration_has_no_invalid_math_tags:
+            updated_exploration = None
+
+    return updated_exploration
 
 
 def discard_draft(exp_id, user_id):

@@ -158,7 +158,9 @@ angular.module('oppia').filter('parameterizeRuleDescription', [
           replacementText = inputs[varName] + '';
         } else if (
           varType === 'CodeString' || varType === 'UnicodeString' ||
-          varType === 'LogicErrorCategory' || varType === 'NormalizedString') {
+          varType === 'LogicErrorCategory' || varType === 'NormalizedString' ||
+          varType === 'AlgebraicExpression' || varType === 'MathEquation' ||
+          varType === 'PositionOfTerms') {
           replacementText = inputs[varName];
         } else if (varType === 'ListOfCodeEvaluation') {
           replacementText = '[';
@@ -170,7 +172,7 @@ angular.module('oppia').filter('parameterizeRuleDescription', [
           }
           replacementText += ']';
         } else {
-          throw Error('Unknown variable type in rule description');
+          throw new Error('Unknown variable type in rule description');
         }
 
         // Replaces all occurances of $ with $$.

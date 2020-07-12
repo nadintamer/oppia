@@ -186,6 +186,7 @@ describe('Editable exploration backend API service', () => {
 
       expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(true);
 
+
       exploration.title = 'New Title';
       exploration.version = '2';
 

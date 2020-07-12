@@ -16,27 +16,35 @@
  * @fileoverview Unit tests for QuestionSummaryObjectFactory.
  */
 
-import { QuestionSummaryObjectFactory } from
+import { IQuestionSummaryBackendDict, QuestionSummaryObjectFactory } from
   'domain/question/QuestionSummaryObjectFactory';
 
 describe('Question summary object factory', () => {
-  describe('QuestionSummaryObjectFactory', () => {
-    let questionSummaryObjectFactory: QuestionSummaryObjectFactory;
-    let summaryDict: any;
+  let questionSummaryObjectFactory: QuestionSummaryObjectFactory;
+  let summaryDict: IQuestionSummaryBackendDict;
 
-    beforeEach(() => {
-      questionSummaryObjectFactory = new QuestionSummaryObjectFactory();
-      summaryDict = {
-        id: 'question_id',
-        question_content: 'Question 1'
-      };
-    });
+  beforeEach(() => {
+    questionSummaryObjectFactory = new QuestionSummaryObjectFactory();
+    summaryDict = {
+      id: 'question_id',
+      question_content: 'Question 1'
+    };
+  });
 
-    it('should create a new question summary', () => {
-      var questionSummary = questionSummaryObjectFactory.createFromBackendDict(
-        summaryDict);
-      expect(questionSummary.getQuestionId()).toEqual('question_id');
-      expect(questionSummary.getQuestionContent()).toEqual('Question 1');
-    });
+  it('should create a new question summary', () => {
+    const questionSummary = (
+      questionSummaryObjectFactory.createFromBackendDict(summaryDict));
+    expect(questionSummary.getQuestionId()).toEqual('question_id');
+    expect(questionSummary.getQuestionContent()).toEqual('Question 1');
+  });
+
+  it('should change question content in a question summary', () => {
+    const newQuestionContent = 'New question content';
+    const questionSummary = (
+      questionSummaryObjectFactory.createFromBackendDict(summaryDict));
+    expect(questionSummary.getQuestionContent()).toEqual('Question 1');
+
+    questionSummary.setQuestionContent(newQuestionContent);
+    expect(questionSummary.getQuestionContent()).toEqual(newQuestionContent);
   });
 });

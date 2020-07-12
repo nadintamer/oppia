@@ -16,29 +16,48 @@
  * @fileoverview Directive for CK Editor.
  */
 
+require('third-party-imports/ckeditor.import.ts');
 require('services/context.service.ts');
 require('services/rte-helper.service.ts');
 
+interface UiConfig {
+  (): UiConfig;
+  'hide_complex_extensions': boolean;
+  'startupFocusEnabled'?: boolean;
+}
+
+interface CkeditorCustomScope extends ng.IScope {
+  uiConfig: UiConfig;
+}
+
 angular.module('oppia').directive('ckEditor4Rte', [
-  'ContextService', 'RteHelperService',
-  function(ContextService, RteHelperService) {
+  'ContextService', 'RteHelperService', 'ENABLE_SVG_EDITOR_RTE',
+  function(ContextService, RteHelperService, ENABLE_SVG_EDITOR_RTE) {
     return {
       restrict: 'E',
       scope: {
         uiConfig: '&'
       },
       template: '<div><div></div>' +
-                '<div contenteditable="true" class="oppia-rte">' +
+                '<div contenteditable="true" ' +
+                'class="oppia-rte-resizer oppia-rte">' +
                 '</div></div>',
       require: '?ngModel',
 
-      link: function(scope: ICustomScope, el, attr, ngModel) {
+      link: function(scope: CkeditorCustomScope, el, attr, ngModel) {
         var _RICH_TEXT_COMPONENTS = RteHelperService.getRichTextComponents();
         var names = [];
         var icons = [];
         var canReferToSkills = ContextService.canEntityReferToSkills();
 
         _RICH_TEXT_COMPONENTS.forEach(function(componentDefn) {
+          // TODO(#9358): Remove the if condition once the svgdiagram is
+          // available for the users.
+          if (componentDefn.id === 'svgdiagram') {
+            if (!ENABLE_SVG_EDITOR_RTE) {
+              return;
+            }
+          }
           if (!((scope.uiConfig() &&
             scope.uiConfig().hide_complex_extensions &&
             componentDefn.isComplex) ||
@@ -47,6 +66,21 @@ angular.module('oppia').directive('ckEditor4Rte', [
             icons.push(componentDefn.iconDataUrl);
           }
         });
+
+        var editable = document.querySelectorAll('.oppia-rte-resizer');
+        var resize = function() {
+          $('.oppia-rte-resizer').css({
+            width: '100%'
+          });
+        };
+        for (var i in editable) {
+          (<HTMLElement>editable[i]).onchange = function() {
+            resize();
+          };
+          (<HTMLElement>editable[i]).onclick = function() {
+            resize();
+          };
+        }
 
         /**
          * Create rules to whitelist all the rich text components and

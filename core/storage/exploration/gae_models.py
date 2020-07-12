@@ -23,7 +23,6 @@ import datetime
 
 from constants import constants
 import core.storage.base_model.gae_models as base_models
-import core.storage.user.gae_models as user_models
 import feconf
 import python_utils
 
@@ -32,11 +31,13 @@ from google.appengine.ext import ndb
 
 class ExplorationSnapshotMetadataModel(base_models.BaseSnapshotMetadataModel):
     """Storage model for the metadata for an exploration snapshot."""
+
     pass
 
 
 class ExplorationSnapshotContentModel(base_models.BaseSnapshotContentModel):
     """Storage model for the content of an exploration snapshot."""
+
     pass
 
 
@@ -46,6 +47,7 @@ class ExplorationModel(base_models.VersionedModel):
     This class should only be imported by the exploration services file
     and the exploration model test file.
     """
+
     SNAPSHOT_METADATA_CLASS = ExplorationSnapshotMetadataModel
     SNAPSHOT_CONTENT_CLASS = ExplorationSnapshotContentModel
     ALLOW_REVERT = True
@@ -124,11 +126,6 @@ class ExplorationModel(base_models.VersionedModel):
         """
         return cls.SNAPSHOT_METADATA_CLASS.exists_for_user_id(user_id)
 
-    @staticmethod
-    def get_user_id_migration_policy():
-        """ExplorationModel doesn't have any field with user ID."""
-        return base_models.USER_ID_MIGRATION_POLICY.NOT_APPLICABLE
-
     @classmethod
     def get_exploration_count(cls):
         """Returns the total number of explorations."""
@@ -155,21 +152,14 @@ class ExplorationModel(base_models.VersionedModel):
         super(ExplorationModel, self)._trusted_commit(
             committer_id, commit_type, commit_message, commit_cmds)
 
-        committer_user_settings_model = (
-            user_models.UserSettingsModel.get_by_id(committer_id))
-        committer_username = (
-            committer_user_settings_model.username
-            if committer_user_settings_model else '')
-
         exp_rights = ExplorationRightsModel.get_by_id(self.id)
 
-        # TODO(msl): test if put_async() leads to any problems (make
+        # TODO(msl): Test if put_async() leads to any problems (make
         # sure summary dicts get updated correctly when explorations
         # are changed).
         exploration_commit_log = ExplorationCommitLogEntryModel.create(
-            self.id, self.version, committer_id, committer_username,
-            commit_type, commit_message, commit_cmds, exp_rights.status,
-            exp_rights.community_owned
+            self.id, self.version, committer_id, commit_type, commit_message,
+            commit_cmds, exp_rights.status, exp_rights.community_owned
         )
         exploration_commit_log.exploration_id = self.id
         exploration_commit_log.put()
@@ -195,12 +185,6 @@ class ExplorationModel(base_models.VersionedModel):
             commit_message, force_deletion=force_deletion)
 
         if not force_deletion:
-            committer_user_settings_model = (
-                user_models.UserSettingsModel.get_by_id(committer_id))
-            committer_username = (
-                committer_user_settings_model.username
-                if committer_user_settings_model else '')
-
             commit_log_models = []
             exp_rights_models = ExplorationRightsModel.get_multi(
                 entity_ids, include_deleted=True)
@@ -210,7 +194,7 @@ class ExplorationModel(base_models.VersionedModel):
                 versioned_models, exp_rights_models)
             for model, rights_model in versioned_and_exp_rights_models:
                 exploration_commit_log = ExplorationCommitLogEntryModel.create(
-                    model.id, model.version, committer_id, committer_username,
+                    model.id, model.version, committer_id,
                     cls._COMMIT_TYPE_DELETE,
                     commit_message, [{'cmd': cls.CMD_DELETE_COMMIT}],
                     rights_model.status, rights_model.community_owned
@@ -223,8 +207,7 @@ class ExplorationModel(base_models.VersionedModel):
 class ExplorationContextModel(base_models.BaseModel):
     """Model for storing Exploration context.
 
-    The ID of instances of this class has the form
-    {{random_hash_of_12_chars}}, which is the ID of the exploration itself.
+    The ID of instances of this class is the ID of the exploration itself.
     """
 
     # The ID of the story that the exploration is a part of.
@@ -248,28 +231,25 @@ class ExplorationContextModel(base_models.BaseModel):
 
         Args:
             unused_user_id: str. The (unused) ID of the user whose data should
-            be checked.
+                be checked.
 
         Returns:
             bool. Whether any models refer to the given user ID.
         """
         return False
 
-    @staticmethod
-    def get_user_id_migration_policy():
-        """ExplorationContextModel doesn't have any field with user ID."""
-        return base_models.USER_ID_MIGRATION_POLICY.NOT_APPLICABLE
-
 
 class ExplorationRightsSnapshotMetadataModel(
         base_models.BaseSnapshotMetadataModel):
     """Storage model for the metadata for an exploration rights snapshot."""
+
     pass
 
 
 class ExplorationRightsSnapshotContentModel(
         base_models.BaseSnapshotContentModel):
     """Storage model for the content of an exploration rights snapshot."""
+
     pass
 
 
@@ -328,7 +308,7 @@ class ExplorationRightsModel(base_models.VersionedModel):
         return base_models.EXPORT_POLICY.CONTAINS_USER_DATA
 
     @staticmethod
-    def transform_dict_to_valid(model_dict):
+    def convert_to_valid_dict(model_dict):
         """Replace invalid fields and values in the ExplorationRightsModel dict.
 
         Some old ExplorationRightsSnapshotContentModels can contain fields
@@ -380,52 +360,6 @@ class ExplorationRightsModel(base_models.VersionedModel):
             )).get(keys_only=True) is not None
             or cls.SNAPSHOT_METADATA_CLASS.exists_for_user_id(user_id))
 
-    @staticmethod
-    def get_user_id_migration_policy():
-        """ExplorationRightsModel has multiple fields with user ID."""
-        return base_models.USER_ID_MIGRATION_POLICY.CUSTOM
-
-    @classmethod
-    def migrate_model(cls, old_user_id, new_user_id):
-        """Migrate model to use the new user ID in the owner_ids, editor_ids,
-        voice_artist_ids and viewer_ids.
-
-        Args:
-            old_user_id: str. The old user ID.
-            new_user_id: str. The new user ID.
-        """
-        migrated_models = []
-        for model in cls.query(ndb.OR(
-                cls.owner_ids == old_user_id, cls.editor_ids == old_user_id,
-                cls.voice_artist_ids == old_user_id,
-                cls.viewer_ids == old_user_id)).fetch():
-            model.owner_ids = [
-                new_user_id if owner_id == old_user_id else owner_id
-                for owner_id in model.owner_ids]
-            model.editor_ids = [
-                new_user_id if editor_id == old_user_id else editor_id
-                for editor_id in model.editor_ids]
-            model.voice_artist_ids = [
-                new_user_id if voice_art_id == old_user_id else voice_art_id
-                for voice_art_id in model.voice_artist_ids]
-            model.viewer_ids = [
-                new_user_id if viewer_id == old_user_id else viewer_id
-                for viewer_id in model.viewer_ids]
-            migrated_models.append(model)
-        cls.put_multi(migrated_models, update_last_updated_time=False)
-
-    def verify_model_user_ids_exist(self):
-        """Check if UserSettingsModel exists for all the ids in owner_ids,
-        editor_ids, voice_artist_ids and viewer_ids.
-        """
-        user_ids = (self.owner_ids + self.editor_ids + self.voice_artist_ids +
-                    self.viewer_ids)
-        user_ids = [user_id for user_id in user_ids
-                    if user_id not in feconf.SYSTEM_USERS]
-        user_settings_models = user_models.UserSettingsModel.get_multi(
-            user_ids, include_deleted=True)
-        return all(model is not None for model in user_settings_models)
-
     def save(self, committer_id, commit_message, commit_cmds):
         """Saves a new version of the exploration, updating the Exploration
         datastore model.
@@ -465,24 +399,19 @@ class ExplorationRightsModel(base_models.VersionedModel):
                     cmd: str. Unique command.
                 and then additional arguments for that command.
         """
+
         super(ExplorationRightsModel, self)._trusted_commit(
             committer_id, commit_type, commit_message, commit_cmds)
 
         # Create and delete events will already be recorded in the
         # ExplorationModel.
         if commit_type not in ['create', 'delete']:
-            committer_user_settings_model = (
-                user_models.UserSettingsModel.get_by_id(committer_id))
-            committer_username = (
-                committer_user_settings_model.username
-                if committer_user_settings_model else '')
-            # TODO(msl): test if put_async() leads to any problems (make
+            # TODO(msl): Test if put_async() leads to any problems (make
             # sure summary dicts get updated correctly when explorations
             # are changed).
             ExplorationCommitLogEntryModel(
                 id=('rights-%s-%s' % (self.id, self.version)),
                 user_id=committer_id,
-                username=committer_username,
                 exploration_id=self.id,
                 commit_type=commit_type,
                 commit_message=commit_message,
@@ -535,8 +464,9 @@ class ExplorationCommitLogEntryModel(base_models.BaseCommitLogEntryModel):
     ExplorationModel or ExplorationRightsModel occurs.
 
     The id for this model is of the form
-    'exploration-{{EXP_ID}}-{{EXP_VERSION}}'.
+    'exploration-[exploration_id]-[version]'.
     """
+
     # The id of the exploration being edited.
     exploration_id = ndb.StringProperty(indexed=True, required=True)
 
@@ -584,7 +514,7 @@ class ExplorationCommitLogEntryModel(base_models.BaseCommitLogEntryModel):
 
         Returns:
             str. A string containing exploration ID and
-                exploration version.
+            exploration version.
         """
         return 'exploration-%s-%s' % (exp_id, exp_version)
 
@@ -604,8 +534,8 @@ class ExplorationCommitLogEntryModel(base_models.BaseCommitLogEntryModel):
                 commits are needed.
 
         Returns:
-            3-tuple of (results, cursor, more) which were created which were
-            created no earlier than max_age before the current time where:
+            3-tuple of (results, cursor, more). Created no earlier than the
+            max_age before the current time where:
                 results: List of query results.
                 cursor: str or None. A query cursor pointing to the next
                     batch of results. If there are no more results, this will
@@ -693,6 +623,9 @@ class ExpSummaryModel(base_models.BaseModel):
     viewer_ids = ndb.StringProperty(indexed=True, repeated=True)
     # The user_ids of users who have contributed (humans who have made a
     # positive (not just a revert) change to the exploration's content).
+    # NOTE TO DEVELOPERS: contributor_ids and contributors_summary need to be
+    # synchronized, meaning that the keys in contributors_summary need be
+    # equal to the contributor_ids list.
     contributor_ids = ndb.StringProperty(indexed=True, repeated=True)
     # A dict representing the contributors of non-trivial commits to this
     # exploration. Each key of this dict is a user_id, and the corresponding
@@ -701,6 +634,7 @@ class ExpSummaryModel(base_models.BaseModel):
     # The version number of the exploration after this commit. Only populated
     # for commits to an exploration (as opposed to its rights, etc.).
     version = ndb.IntegerProperty()
+
     # DEPRECATED in v2.8.3. Do not use.
     translator_ids = ndb.StringProperty(indexed=True, repeated=True)
 
@@ -729,44 +663,6 @@ class ExpSummaryModel(base_models.BaseModel):
             cls.contributor_ids == user_id
         )).get(keys_only=True) is not None
 
-    @staticmethod
-    def get_user_id_migration_policy():
-        """ExpSummaryModel has multiple fields with user ID."""
-        return base_models.USER_ID_MIGRATION_POLICY.CUSTOM
-
-    @classmethod
-    def migrate_model(cls, old_user_id, new_user_id):
-        """Migrate model to use the new user ID in the owner_ids, editor_ids,
-        voice_artist_ids, viewer_ids and contributor_ids.
-
-        Args:
-            old_user_id: str. The old user ID.
-            new_user_id: str. The new user ID.
-        """
-        migrated_models = []
-        for model in cls.query(ndb.OR(
-                cls.owner_ids == old_user_id, cls.editor_ids == old_user_id,
-                cls.voice_artist_ids == old_user_id,
-                cls.viewer_ids == old_user_id,
-                cls.contributor_ids == old_user_id)).fetch():
-            model.owner_ids = [
-                new_user_id if owner_id == old_user_id else owner_id
-                for owner_id in model.owner_ids]
-            model.editor_ids = [
-                new_user_id if editor_id == old_user_id else editor_id
-                for editor_id in model.editor_ids]
-            model.voice_artist_ids = [
-                new_user_id if voice_art_id == old_user_id else voice_art_id
-                for voice_art_id in model.voice_artist_ids]
-            model.viewer_ids = [
-                new_user_id if viewer_id == old_user_id else viewer_id
-                for viewer_id in model.viewer_ids]
-            model.contributor_ids = [
-                new_user_id if contributor_id == old_user_id else contributor_id
-                for contributor_id in model.contributor_ids]
-            migrated_models.append(model)
-        cls.put_multi(migrated_models, update_last_updated_time=False)
-
     @classmethod
     def get_non_private(cls):
         """Returns an iterable with non-private ExpSummary models.
@@ -790,7 +686,7 @@ class ExpSummaryModel(base_models.BaseModel):
 
         Returns:
             iterable. An iterable with the top rated exp summaries that are
-                public in descending order of scaled_average_rating.
+            public in descending order of scaled_average_rating.
         """
         return ExpSummaryModel.query().filter(
             ExpSummaryModel.status == constants.ACTIVITY_STATUS_PUBLIC
@@ -810,7 +706,7 @@ class ExpSummaryModel(base_models.BaseModel):
 
         Returns:
             iterable. An iterable with private exp summaries that are at least
-                viewable by the given user.
+            viewable by the given user.
         """
         return ExpSummaryModel.query().filter(
             ExpSummaryModel.status == constants.ACTIVITY_STATUS_PRIVATE
@@ -832,7 +728,7 @@ class ExpSummaryModel(base_models.BaseModel):
 
         Returns:
             iterable. An iterable with exp summaries that are at least
-                editable by the given user.
+            editable by the given user.
         """
         return ExpSummaryModel.query().filter(
             ndb.OR(ExpSummaryModel.owner_ids == user_id,
@@ -849,9 +745,9 @@ class ExpSummaryModel(base_models.BaseModel):
             limit: int. The maximum number of results to return.
 
         Returns:
-            An iterable with exp summaries that are recently published. The
-                returned list is sorted by the time of publication with latest
-                being first in the list.
+            iterable. An iterable with exp summaries that are
+            recently published. The returned list is sorted by the time of
+            publication with latest being first in the list.
         """
         return ExpSummaryModel.query().filter(
             ExpSummaryModel.status == constants.ACTIVITY_STATUS_PUBLIC
@@ -868,15 +764,3 @@ class ExpSummaryModel(base_models.BaseModel):
         function.
         """
         return base_models.EXPORT_POLICY.NOT_APPLICABLE
-
-    def verify_model_user_ids_exist(self):
-        """Check if UserSettingsModel exists for all the ids in owner_ids,
-        editor_ids, voice_artist_ids, viewer_ids and contributor_ids.
-        """
-        user_ids = (self.owner_ids + self.editor_ids + self.voice_artist_ids +
-                    self.viewer_ids + self.contributor_ids)
-        user_ids = [user_id for user_id in user_ids
-                    if user_id not in feconf.SYSTEM_USERS]
-        user_settings_models = user_models.UserSettingsModel.get_multi(
-            user_ids, include_deleted=True)
-        return all(model is not None for model in user_settings_models)

@@ -43,24 +43,32 @@ describe('Story object factory', () => {
         nodes: [{
           id: 'node_1',
           title: 'Title 1',
+          description: 'Description',
           prerequisite_skill_ids: [],
           acquired_skill_ids: [],
           destination_node_ids: [],
           outline: 'Outline',
           exploration_id: null,
-          outline_is_finalized: false
+          outline_is_finalized: false,
+          thumbnail_filename: 'img.png',
+          thumbnail_bg_color: '#a33f40'
         }],
         next_node_id: 'node_3'
       },
       language_code: 'en'
     };
     _sampleStory = storyObjectFactory.createFromBackendDict(
+      // TS ignore is used because sample story doesn't have thumbail to test
+      // validations.
+      // @ts-ignore
       sampleStoryBackendDict);
   });
 
   it('should be able to create an interstitial story object', () => {
     var story = storyObjectFactory.createInterstitialStory();
     expect(story.getId()).toEqual(null);
+    expect(story.getThumbnailFilename()).toEqual(null);
+    expect(story.getThumbnailBgColor()).toEqual(null);
     expect(story.getTitle()).toEqual('Story title loading');
     expect(story.getDescription()).toEqual('Story description loading');
     expect(story.getLanguageCode()).toBe('en');
@@ -71,6 +79,14 @@ describe('Story object factory', () => {
 
   it('should correctly validate a valid story', () => {
     expect(_sampleStory.validate()).toEqual([]);
+  });
+
+  it('should correctly prepublish validate a story', () => {
+    expect(_sampleStory.prepublishValidate()).toEqual([
+      'Story should have a thumbnail.']);
+    _sampleStory.setThumbnailFilename('image.png');
+    _sampleStory.setThumbnailBgColor('#F8BF74');
+    expect(_sampleStory.prepublishValidate()).toEqual([]);
   });
 
   it('should correctly validate a story', () => {
@@ -98,11 +114,16 @@ describe('Story object factory', () => {
           destination_node_ids: [],
           outline: 'Outline',
           exploration_id: null,
-          outline_is_finalized: false
+          outline_is_finalized: false,
+          description: 'Description',
+          thumbnail_filename: 'img.png',
+          thumbnail_bg_color: '#a33f40'
         }],
         next_node_id: 'node_3'
       },
-      language_code: 'en'
+      language_code: 'en',
+      thumbnail_filename: 'img.png',
+      thumbnail_bg_color: '#a33f40'
     });
 
     expect(_sampleStory).not.toBe(secondStory);

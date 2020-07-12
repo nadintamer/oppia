@@ -34,21 +34,6 @@ import { SVMPredictionService } from 'classifiers/svm-prediction.service';
 import { WinnowingPreprocessingService } from
   'classifiers/winnowing-preprocessing.service';
 
-// TODO(#7165): Replace 'any' with the exact type
-/* eslint-disable camelcase */
-export interface IKNN {
-  fingerprint_data: any;
-  occurrence: any;
-  top: any;
-  K?: any;
-  T?: any;
-  token_to_id?:any;
-}
-export interface IClassifierData {
-  KNN: IKNN
-  cv_vocabulary: object;
-  SVM: object;
-}
 @Injectable({
   providedIn: 'root'
 })
@@ -269,7 +254,7 @@ export class CodeReplPredictionService {
 
     const nearestNeighborsIndexes = (
       this.findNearestNeighborsIndexes(knnData, program));
-    const nearesNeighborsClasses = [];
+    const nearesNeighborsClasses: number[][] = [];
 
     // Find classes of nearest neighbor programs.
     nearestNeighborsIndexes.forEach((neighbor: number[]) => {
@@ -282,7 +267,7 @@ export class CodeReplPredictionService {
 
     // Count how many times a class appears in nearest neighbors.
     const classCount = {};
-    nearesNeighborsClasses.forEach((neighbor: any[]) => {
+    nearesNeighborsClasses.forEach(neighbor => {
       const outputClass = neighbor[0];
       if (classCount.hasOwnProperty(outputClass)) {
         classCount[outputClass] += 1;

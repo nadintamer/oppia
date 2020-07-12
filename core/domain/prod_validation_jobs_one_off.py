@@ -43,7 +43,9 @@ from core.domain import question_services
 from core.domain import recommendations_services
 from core.domain import rights_manager
 from core.domain import skill_domain
+from core.domain import skill_fetchers
 from core.domain import skill_services
+from core.domain import stats_services
 from core.domain import story_domain
 from core.domain import story_fetchers
 from core.domain import subtopic_page_domain
@@ -64,20 +66,20 @@ import utils
     activity_models, audit_models, base_models,
     classifier_models, collection_models,
     config_models, email_models, exp_models,
-    feedback_models, job_models,
+    feedback_models, improvements_models, job_models,
     opportunity_models, question_models,
-    recommendations_models, skill_models,
+    recommendations_models, skill_models, stats_models,
     story_models, suggestion_models, topic_models,
     user_models,) = (
         models.Registry.import_models([
             models.NAMES.activity, models.NAMES.audit, models.NAMES.base_model,
             models.NAMES.classifier, models.NAMES.collection,
             models.NAMES.config, models.NAMES.email, models.NAMES.exploration,
-            models.NAMES.feedback, models.NAMES.job,
+            models.NAMES.feedback, models.NAMES.improvements, models.NAMES.job,
             models.NAMES.opportunity, models.NAMES.question,
             models.NAMES.recommendations, models.NAMES.skill,
-            models.NAMES.story, models.NAMES.suggestion, models.NAMES.topic,
-            models.NAMES.user]))
+            models.NAMES.statistics, models.NAMES.story,
+            models.NAMES.suggestion, models.NAMES.topic, models.NAMES.user]))
 datastore_services = models.Registry.import_datastore_services()
 
 ALLOWED_AUDIO_EXTENSIONS = list(feconf.ACCEPTED_AUDIO_EXTENSIONS.keys())
@@ -90,6 +92,7 @@ IMAGE_PATH_REGEX = (
 AUDIO_PATH_REGEX = (
     '%saudio/[A-Za-z0-9-_]{1,}\\.(%s)' % (
         ASSETS_PATH_REGEX, ('|').join(ALLOWED_AUDIO_EXTENSIONS)))
+USER_ID_REGEX = 'uid_[a-z]{32}'
 ALL_CONTINUOUS_COMPUTATION_MANAGERS_CLASS_NAMES = [
     'FeedbackAnalyticsAggregator',
     'InteractionAnswerSummariesAggregator',
@@ -105,16 +108,9 @@ TARGET_TYPE_TO_TARGET_MODEL = {
     suggestion_models.TARGET_TYPE_TOPIC: (
         topic_models.TopicModel)
 }
-VALID_SCORE_CATEGORIES_FOR_TYPE_CONTENT = [
-    '%s\\.%s' % (
-        suggestion_models.SCORE_TYPE_CONTENT, category) for category in (
-            constants.ALL_CATEGORIES)]
 VALID_SCORE_CATEGORIES_FOR_TYPE_QUESTION = [
     '%s\\.[A-Za-z0-9-_]{1,%s}' % (
         suggestion_models.SCORE_TYPE_QUESTION, base_models.ID_LENGTH)]
-ALLOWED_SCORE_CATEGORIES = (
-    VALID_SCORE_CATEGORIES_FOR_TYPE_CONTENT +
-    VALID_SCORE_CATEGORIES_FOR_TYPE_QUESTION)
 
 
 class BaseModelValidator(python_utils.OBJECT):
@@ -321,10 +317,10 @@ class BaseSummaryModelValidator(BaseModelValidator):
 
         Returns:
             tuple(str, list(tuple), dict). A tuple with first element as
-                external model name, second element as a tuple of
-                cls.external_instance_details and the third element
-                as a properties dict with key as property name in summary
-                model and value as property name in external model.
+            external model name, second element as a tuple of
+            cls.external_instance_details and the third element
+            as a properties dict with key as property name in summary
+            model and value as property name in external model.
 
         Raises:
             NotImplementedError. This function has not yet been implemented.
@@ -486,7 +482,7 @@ class BaseSnapshotMetadataModelValidator(BaseSnapshotContentModelValidator):
 
         Returns:
             change_domain.BaseChange. A domain object class for the
-                changes made by commit commands of the model.
+            changes made by commit commands of the model.
 
         Raises:
             NotImplementedError. This function has not yet been implemented.
@@ -609,7 +605,7 @@ class BaseUserModelValidator(BaseModelValidator):
 
     @classmethod
     def _get_model_id_regex(cls, unused_item):
-        return '^\\d+$'
+        return r'^%s$' % USER_ID_REGEX
 
     @classmethod
     def _get_exp_ids(cls, unused_item):
@@ -686,10 +682,10 @@ class BaseUserModelValidator(BaseModelValidator):
 
         Returns:
             list(tuple(str, str, list, str, list).
-                A list of tuple which consists of External model name,
-                property name in model, list of property value in model,
-                property name in external model, list of property value
-                in external model.
+            A list of tuple which consists of External model name,
+            property name in model, list of property value in model,
+            property name in external model, list of property value
+            in external model.
         """
         return []
 
@@ -785,6 +781,22 @@ class RoleQueryAuditModelValidator(BaseModelValidator):
     @classmethod
     def _get_external_id_relationships(cls, item):
         return {'user_ids': (user_models.UserSettingsModel, [item.user_id])}
+
+
+class UsernameChangeAuditModelValidator(BaseModelValidator):
+    """Class for validating UsernameChangeAuditModels."""
+
+    @classmethod
+    def _get_model_id_regex(cls, item):
+        # Valid id: [committer_id].[timestamp_in_sec]
+        # committer_id refers to the user that is making the change.
+        regex_string = '^%s\\.\\d+$' % item.committer_id
+        return regex_string
+
+    @classmethod
+    def _get_external_id_relationships(cls, item):
+        return {'committer_ids': (
+            user_models.UserSettingsModel, [item.committer_id])}
 
 
 class ClassifierTrainingJobModelValidator(BaseModelValidator):
@@ -975,7 +987,7 @@ class CollectionModelValidator(BaseModelValidator):
                 snapshot_model_ids),
             'snapshot_content_ids': (
                 collection_models.CollectionSnapshotContentModel,
-                snapshot_model_ids),
+                snapshot_model_ids)
         }
 
 
@@ -1435,7 +1447,7 @@ class SkillOpportunityModelValidator(BaseSummaryModelValidator):
             # function.
             if skill_model is None or skill_model.deleted:
                 continue
-            skill = skill_services.get_skill_from_model(skill_model)
+            skill = skill_fetchers.get_skill_from_model(skill_model)
             question_skill_links = (
                 question_services.get_question_skill_links_of_skill(
                     skill.id, skill.description))
@@ -1690,8 +1702,9 @@ class GeneralFeedbackEmailReplyToIdModelValidator(BaseModelValidator):
     @classmethod
     def _get_model_id_regex(cls, unused_item):
         return (
-            '^\\d+\\.(%s)\\.[A-Za-z0-9-_]{1,%s}\\.'
+            '^%s\\.(%s)\\.[A-Za-z0-9-_]{1,%s}\\.'
             '[A-Za-z0-9=+/]{1,}') % (
+                USER_ID_REGEX,
                 ('|').join(suggestion_models.TARGET_TYPE_CHOICES),
                 base_models.ID_LENGTH)
 
@@ -1757,7 +1770,7 @@ class ExplorationModelValidator(BaseModelValidator):
                 snapshot_model_ids),
             'snapshot_content_ids': (
                 exp_models.ExplorationSnapshotContentModel,
-                snapshot_model_ids),
+                snapshot_model_ids)
         }
 
 
@@ -2182,7 +2195,7 @@ class GeneralFeedbackThreadUserModelValidator(BaseModelValidator):
         thread_id_string = '%s\\.[A-Za-z0-9-_]{1,%s}\\.[A-Za-z0-9-_=]{1,}' % (
             ('|').join(suggestion_models.TARGET_TYPE_CHOICES),
             base_models.ID_LENGTH)
-        regex_string = '^\\d*\\.%s$' % thread_id_string
+        regex_string = '^%s\\.%s$' % (USER_ID_REGEX, thread_id_string)
         return regex_string
 
     @classmethod
@@ -2217,7 +2230,7 @@ class UnsentFeedbackEmailModelValidator(BaseModelValidator):
 
     @classmethod
     def _get_model_id_regex(cls, unused_item):
-        return '^\\d*$'
+        return '^%s$' % USER_ID_REGEX
 
     @classmethod
     def _get_external_id_relationships(cls, item):
@@ -2267,7 +2280,7 @@ class JobModelValidator(BaseModelValidator):
 
     @classmethod
     def _get_model_id_regex(cls, item):
-        # Valid id: [job_type].[current time].[random int]
+        # Valid id: [job_type]-[current time]-[random int]
         regex_string = '^%s-\\d*-\\d*$' % item.job_type
         return regex_string
 
@@ -2666,7 +2679,7 @@ class SkillModelValidator(BaseModelValidator):
 
     @classmethod
     def _get_model_domain_object_instance(cls, item):
-        return skill_services.get_skill_from_model(item)
+        return skill_fetchers.get_skill_from_model(item)
 
     @classmethod
     def _get_external_id_relationships(cls, item):
@@ -2989,8 +3002,8 @@ class StorySummaryModelValidator(BaseSummaryModelValidator):
         }
 
     @classmethod
-    def _validate_node_count(cls, item):
-        """Validate that node_count of model is equal to number of nodes
+    def _validate_node_titles(cls, item):
+        """Validate that node_titles of model is equal to list of node titles
         in StoryModel.story_contents.
 
         Args:
@@ -3007,11 +3020,12 @@ class StorySummaryModelValidator(BaseSummaryModelValidator):
             if story_model is None or story_model.deleted:
                 continue
             nodes = story_model.story_contents['nodes']
-            if item.node_count != len(nodes):
-                cls.errors['node count check'].append((
-                    'Entity id %s: Node count: %s does not match the '
-                    'number of nodes in story_contents dict: %s') % (
-                        item.id, item.node_count, nodes))
+            node_titles = [node.title for node in nodes]
+            if item.node_titles != node_titles:
+                cls.errors['node titles check'].append((
+                    'Entity id %s: Node titles: %s does not match the '
+                    'nodes in story_contents dict: %s') % (
+                        item.id, item.node_titles, nodes))
 
     @classmethod
     def _get_external_model_properties(cls):
@@ -3034,7 +3048,7 @@ class StorySummaryModelValidator(BaseSummaryModelValidator):
 
     @classmethod
     def _get_custom_validation_functions(cls):
-        return [cls._validate_node_count]
+        return [cls._validate_node_titles]
 
 
 class GeneralSuggestionModelValidator(BaseModelValidator):
@@ -3135,11 +3149,54 @@ class GeneralSuggestionModelValidator(BaseModelValidator):
                 'suggestion is in review' % (item.id, item.final_reviewer_id))
 
     @classmethod
+    def _validate_score_category(cls, item):
+        """Validate that the score_category subtype for suggestions matches the
+        exploration category.
+
+        Args:
+            item: ndb.Model. GeneralSuggestionModel to validate.
+        """
+        if item.target_type not in TARGET_TYPE_TO_TARGET_MODEL:
+            return
+        score_category_type = (
+            item.score_category.split(
+                suggestion_models.SCORE_CATEGORY_DELIMITER)[0])
+        score_category_sub_type = (
+            item.score_category.split(
+                suggestion_models.SCORE_CATEGORY_DELIMITER)[1])
+        if item.target_type == suggestion_models.TARGET_TYPE_EXPLORATION:
+            target_model_class_model_id_model_tuples = (
+                cls.external_instance_details['%s_ids' % item.target_type])
+
+            for (_, _, target_model) in (
+                    target_model_class_model_id_model_tuples):
+                # The case for missing target external model is ignored here
+                # since errors for missing target external model are already
+                # checked and stored in _validate_external_id_relationships
+                # function.
+                if target_model is None or target_model.deleted:
+                    continue
+                if target_model.category != score_category_sub_type:
+                    cls.errors['score category subtype check'].append(
+                        'Entity id %s: score category sub %s does not match'
+                        ' target exploration category %s' % (
+                            item.id, score_category_sub_type,
+                            target_model.category))
+        if score_category_type == suggestion_models.SCORE_TYPE_QUESTION:
+            score_category_regex = (
+                '^(%s)$' % ('|').join(VALID_SCORE_CATEGORIES_FOR_TYPE_QUESTION))
+            if not re.compile(score_category_regex).match(item.score_category):
+                cls.errors['score category check'].append(
+                    'Entity id %s: Score category %s is invalid' % (
+                        item.id, item.score_category))
+
+    @classmethod
     def _get_custom_validation_functions(cls):
         return [
             cls._validate_target_type,
             cls._validate_target_version_at_submission,
-            cls._validate_final_reveiwer_id]
+            cls._validate_final_reveiwer_id,
+            cls._validate_score_category]
 
 
 class GeneralVoiceoverApplicationModelValidator(BaseModelValidator):
@@ -3271,25 +3328,11 @@ class TopicModelValidator(BaseModelValidator):
                             item.id, skill_id, subtopic['id']))
 
     @classmethod
-    def _validate_abbreviated_name_is_nonempty(cls, item):
-        """Validate that abbreviated name is nonempty.
-
-        Args:
-            item: ndb.Model. TopicModel to validate.
-        """
-        if not item.abbreviated_name:
-            cls.errors['abbreviated name check'].append(
-                'Entity id %s : Topic name %s: Expected nonempty '
-                'abbreviated name, but received %s.' % (
-                    item.id, item.name, item.abbreviated_name))
-
-    @classmethod
     def _get_custom_validation_functions(cls):
         return [
             cls._validate_canonical_name_is_unique,
             cls._validate_canonical_name_matches_name_in_lowercase,
-            cls._validate_uncategorized_skill_ids_not_in_subtopic_skill_ids,
-            cls._validate_abbreviated_name_is_nonempty]
+            cls._validate_uncategorized_skill_ids_not_in_subtopic_skill_ids]
 
 
 class TopicSnapshotMetadataModelValidator(BaseSnapshotMetadataModelValidator):
@@ -4769,19 +4812,6 @@ class UserContributionScoringModelValidator(BaseUserModelValidator):
         }
 
     @classmethod
-    def _validate_score_category(cls, item):
-        """Validates that score category belongs to allowed score categories.
-
-        Args:
-            item: ndb.Model. UserContributionScoringModel to validate.
-        """
-        score_category_regex = '^(%s)$' % ('|').join(ALLOWED_SCORE_CATEGORIES)
-        if not re.compile(score_category_regex).match(item.score_category):
-            cls.errors['score category check'].append(
-                'Entity id %s: Score category %s is invalid' % (
-                    item.id, item.score_category))
-
-    @classmethod
     def _validate_score(cls, item):
         """Validates that score is non-negative.
 
@@ -4795,9 +4825,7 @@ class UserContributionScoringModelValidator(BaseUserModelValidator):
 
     @classmethod
     def _get_custom_validation_functions(cls):
-        return [
-            cls._validate_score_category,
-            cls._validate_score]
+        return [cls._validate_score]
 
 
 class UserCommunityRightsModelValidator(BaseUserModelValidator):
@@ -4892,9 +4920,242 @@ class PendingDeletionRequestModelValidator(BaseUserModelValidator):
             cls._validate_collections_are_marked_deleted]
 
 
+class TaskEntryModelValidator(BaseModelValidator):
+    """One off job for auditing task entries."""
+
+    # The name of the model which is to be used in the error messages.
+    MODEL_NAME = 'task entry'
+
+    @classmethod
+    def _get_model_id_regex(cls, item):
+        return re.escape(improvements_models.TaskEntryModel.generate_task_id(
+            item.entity_type, item.entity_id, item.entity_version,
+            item.task_type, item.target_type, item.target_id))
+
+    @classmethod
+    def _get_external_id_relationships(cls, item):
+        return {
+            'resolver_ids': (
+                user_models.UserSettingsModel,
+                [item.resolver_id] if item.resolver_id is not None else []),
+            'entity_ids': (exp_models.ExplorationModel, [item.entity_id])
+        }
+
+    @classmethod
+    def _validate_composite_entity_id(cls, item):
+        """Validates the composite_entity_id field of the given item.
+
+        Args:
+            item: improvements_models.TaskEntryModel.
+        """
+        expected_composite_entity_id = (
+            improvements_models.TaskEntryModel.generate_composite_entity_id(
+                item.entity_type, item.entity_id, item.entity_version))
+        if item.composite_entity_id != expected_composite_entity_id:
+            cls.errors['composite_entity_id field check'].append(
+                'Entity id %s: composite_entity_id "%s" should be "%s"' % (
+                    item.id,
+                    item.composite_entity_id,
+                    expected_composite_entity_id))
+
+    @classmethod
+    def _validate_status(cls, item):
+        """Validates the fields of the item relating to the status field.
+
+        Args:
+            item: improvements_models.TaskEntryModel.
+        """
+        if item.status == improvements_models.TASK_STATUS_OPEN:
+            if item.resolver_id:
+                cls.errors['status field check'].append(
+                    'Entity id %s: status is open but resolver_id is "%s", '
+                    'should be empty.' % (item.id, item.resolver_id))
+            if item.resolved_on:
+                cls.errors['status field check'].append(
+                    'Entity id %s: status is open but resolved_on is "%s", '
+                    'should be empty.' % (item.id, item.resolved_on))
+        elif item.status == improvements_models.TASK_STATUS_RESOLVED:
+            if item.resolver_id is None:
+                cls.errors['status field check'].append(
+                    'Entity id %s: status is resolved but resolver_id is not '
+                    'set' % (item.id,))
+            if item.resolved_on is None:
+                cls.errors['status field check'].append(
+                    'Entity id %s: status is resolved but resolved_on is not '
+                    'set' % (item.id,))
+
+    @classmethod
+    def _validate_target_id(cls, item):
+        """Validate that the given item contains an existing exploration state
+        name.
+
+        Args:
+            item: improvements_models.TaskEntryModel.
+        """
+        try:
+            exp_model = exp_models.ExplorationModel.get(
+                item.entity_id, strict=True, version=item.entity_version)
+        except Exception:
+            cls.errors['target_id field check'].append(
+                'Entity id %s: exploration with id "%s" does not exist at '
+                'version %d' % (item.id, item.entity_id, item.entity_version))
+            return
+        if item.target_id not in exp_model.states.keys():
+            cls.errors['target_id field check'].append(
+                'Entity id %s: exploration with id "%s" does not have a state '
+                'named "%s" at version %d' % (
+                    item.id, item.entity_id, item.target_id,
+                    item.entity_version))
+
+    @classmethod
+    def _get_custom_validation_functions(cls):
+        return [
+            cls._validate_composite_entity_id,
+            cls._validate_status,
+            cls._validate_target_id,
+        ]
+
+
+class PlaythroughModelValidator(BaseModelValidator):
+    """Class for validating PlaythroughModel."""
+
+    # The playthrough design was finalized at the end of GSOC 2018: 2018-09-01.
+    PLAYTHROUGH_INTRODUCTION_DATETIME = datetime.datetime(2018, 9, 1)
+
+    @classmethod
+    def _get_external_id_relationships(cls, item):
+        exp_id = item.exp_id
+        exp_version = item.exp_version
+        exp_issues_id = (
+            stats_models.ExplorationIssuesModel.get_entity_id(
+                exp_id, exp_version)
+        )
+
+        return {
+            'exp_ids': (
+                exp_models.ExplorationModel, [item.exp_id]),
+            'exp_issues': (
+                stats_models.ExplorationIssuesModel, [exp_issues_id])
+        }
+
+    @classmethod
+    def _get_model_id_regex(cls, unused_item):
+        return r'^[A-Za-z0-9-_]{1,%s}\.[A-Za-z0-9-_]{1,%s}$' % (
+            base_models.ID_LENGTH, base_models.ID_LENGTH)
+
+    @classmethod
+    def _get_model_domain_object_instance(cls, item):
+        return stats_services.get_playthrough_from_model(item)
+
+    @classmethod
+    def _validate_exploration_id_in_whitelist(cls, item):
+        """Validate the exploration id in playthrough model is in
+        the whitelist.
+
+        Args:
+            item: ndb.Model. PlaythroughModel to validate.
+        """
+        whitelisted_exp_ids_for_playthroughs = (
+            config_domain.WHITELISTED_EXPLORATION_IDS_FOR_PLAYTHROUGHS.value)
+
+        if item.exp_id not in whitelisted_exp_ids_for_playthroughs:
+            cls.errors['exploration id check'].append(
+                'Entity id %s: recorded in exploration_id:%s which '
+                'has not been curated for recording.' % (
+                    item.id, item.exp_id)
+            )
+
+    @classmethod
+    def _validate_reference(cls, item):
+        """Validate the playthrough reference relations.
+
+        Args:
+            item: ndb.Model. PlaythroughModel to validate.
+        """
+        exp_issues_tuples = cls.external_instance_details['exp_issues']
+        for _, _, exp_issues in exp_issues_tuples:
+            # The case for missing ExplorationIssues external model is
+            # ignored here since errors for missing email external model
+            # are already checked and stored in
+            # _validate_external_id_relationships function.
+            exp_id = item.exp_id
+            exp_version = item.exp_version
+
+            issues = []
+            for issue_index, issue in enumerate(exp_issues.unresolved_issues):
+                issue_type = issue['issue_type']
+                if (
+                        item.id in issue['playthrough_ids']
+                        and issue_type == item.issue_type):
+                    issue_customization_args = issue['issue_customization_args']
+                    identifying_arg = (
+                        stats_models.CUSTOMIZATION_ARG_WHICH_IDENTIFIES_ISSUE[
+                            issue_type])
+                    if (
+                            issue_customization_args[identifying_arg] ==
+                            item.issue_customization_args[identifying_arg]):
+                        issues.append((issue_index, issue))
+
+            if len(issues) == 0:
+                cls.errors['reference check'].append(
+                    'Entity id %s: not referenced by any issue of the'
+                    ' corresponding exploration (id=%s, version=%s).' % (
+                        item.id, exp_id, exp_version)
+                )
+            elif len(issues) > 1:
+                issue_indices = [index for index, _ in issues]
+                cls.errors['reference check'].append(
+                    'Entity id %s: referenced by more than one issues of the '
+                    'corresponding exploration (id=%s, version=%s), '
+                    'issue indices: %s.' % (
+                        item.id, exp_id, exp_version, issue_indices)
+                )
+            else:
+                issue_index, issue = issues[0]
+                id_indices = []
+                for id_index, playthrough_id in enumerate(
+                        issue['playthrough_ids']):
+                    if playthrough_id == item.id:
+                        id_indices.append(id_index)
+                if len(id_indices) > 1:
+                    cls.errors['reference check'].append(
+                        'Entity id %s: referenced multiple times in an '
+                        'issue (index=%s) of the corresponding exploration '
+                        '(id=%s, version=%s), duplicated id indices: %s.' % (
+                            item.id, issue_index, exp_id, exp_version,
+                            id_indices)
+                    )
+
+    @classmethod
+    def _validate_created_datetime(cls, item):
+        """Validate the playthrough is created after the GSoC 2018 submission
+        deadline.
+
+        Args:
+            item: ndb.Model. PlaythroughModel to validate.
+        """
+        created_on_datetime = item.created_on
+        if created_on_datetime < cls.PLAYTHROUGH_INTRODUCTION_DATETIME:
+            cls.errors['create datetime check'].append(
+                'Entity id %s: released on %s, which is before the '
+                'GSoC 2018 submission deadline (2018-09-01) and should '
+                'therefore not exist.' % (
+                    item.id, item.created_on.strftime('%Y-%m-%d'))
+            )
+
+    @classmethod
+    def _get_custom_validation_functions(cls):
+        return [
+            cls._validate_exploration_id_in_whitelist,
+            cls._validate_reference,
+            cls._validate_created_datetime,
+        ]
+
+
 MODEL_TO_VALIDATOR_MAPPING = {
     activity_models.ActivityReferencesModel: ActivityReferencesModelValidator,
     audit_models.RoleQueryAuditModel: RoleQueryAuditModelValidator,
+    audit_models.UsernameChangeAuditModel: UsernameChangeAuditModelValidator,
     classifier_models.ClassifierTrainingJobModel: (
         ClassifierTrainingJobModelValidator),
     classifier_models.TrainingJobExplorationMappingModel: (
@@ -4944,6 +5205,7 @@ MODEL_TO_VALIDATOR_MAPPING = {
         GeneralFeedbackThreadUserModelValidator),
     feedback_models.FeedbackAnalyticsModel: FeedbackAnalyticsModelValidator,
     feedback_models.UnsentFeedbackEmailModel: UnsentFeedbackEmailModelValidator,
+    improvements_models.TaskEntryModel: TaskEntryModelValidator,
     job_models.JobModel: JobModelValidator,
     job_models.ContinuousComputationModel: ContinuousComputationModelValidator,
     opportunity_models.ExplorationOpportunitySummaryModel: (
@@ -5025,19 +5287,50 @@ MODEL_TO_VALIDATOR_MAPPING = {
         UserContributionScoringModelValidator),
     user_models.UserCommunityRightsModel: UserCommunityRightsModelValidator,
     user_models.PendingDeletionRequestModel: (
-        PendingDeletionRequestModelValidator)
+        PendingDeletionRequestModelValidator),
+    stats_models.PlaythroughModel: PlaythroughModelValidator,
 }
 
 
-class ProdValidationAuditOneOffJob(jobs.BaseMapReduceOneOffJobManager):
+class ProdValidationAuditOneOffJobMetaClass(type):
+    """Type class for audit one off jobs. Registers classes inheriting from
+    ProdValidationAuditOneOffJob in a list. With this strategy, job writers can
+    define them in separate modules while allowing us to assert that each model
+    has an audit job.
+    """
+
+    _MODEL_AUDIT_ONE_OFF_JOB_NAMES = set()
+
+    def __new__(mcs, name, bases, dct):
+        mcs._MODEL_AUDIT_ONE_OFF_JOB_NAMES.add(name)
+        return super(ProdValidationAuditOneOffJobMetaClass, mcs).__new__(
+            mcs, name, bases, dct)
+
+    @classmethod
+    def get_model_audit_job_names(mcs):
+        """Returns list of job names that have inherited from
+        ProdValidationAuditOneOffJob.
+
+        Returns:
+            tuple(str). The names of the one off audit jobs of this class type.
+        """
+        return sorted(mcs._MODEL_AUDIT_ONE_OFF_JOB_NAMES)
+
+
+class ProdValidationAuditOneOffJob( # pylint: disable=inherit-non-class
+        python_utils.with_metaclass(
+            ProdValidationAuditOneOffJobMetaClass,
+            jobs.BaseMapReduceOneOffJobManager)):
     """Job that audits and validates production models."""
 
     @classmethod
     def entity_classes_to_map_over(cls):
+        """Return a list of datastore class references to map over."""
         raise NotImplementedError
 
     @staticmethod
     def map(model_instance):
+        """Implements a map function which defers to a pre-defined validator."""
         if not model_instance.deleted:
             model_name = model_instance.__class__.__name__
             validator_cls = MODEL_TO_VALIDATOR_MAPPING[type(model_instance)]
@@ -5055,6 +5348,7 @@ class ProdValidationAuditOneOffJob(jobs.BaseMapReduceOneOffJobManager):
 
     @staticmethod
     def reduce(key, values):
+        """Yields number of fully validated models or the failure messages."""
         if 'fully-validated' in key:
             yield (key, len(values))
         else:
@@ -5075,6 +5369,14 @@ class RoleQueryAuditModelAuditOneOffJob(ProdValidationAuditOneOffJob):
     @classmethod
     def entity_classes_to_map_over(cls):
         return [audit_models.RoleQueryAuditModel]
+
+
+class UsernameChangeAuditModelAuditOneOffJob(ProdValidationAuditOneOffJob):
+    """Job that audits and validates UsernameChangeAuditModel."""
+
+    @classmethod
+    def entity_classes_to_map_over(cls):
+        return [audit_models.UsernameChangeAuditModel]
 
 
 class ClassifierTrainingJobModelAuditOneOffJob(ProdValidationAuditOneOffJob):
@@ -5820,3 +6122,19 @@ class PendingDeletionRequestModelAuditOneOffJob(ProdValidationAuditOneOffJob):
     @classmethod
     def entity_classes_to_map_over(cls):
         return [user_models.PendingDeletionRequestModel]
+
+
+class TaskEntryModelAuditOneOffJob(ProdValidationAuditOneOffJob):
+    """Job that audits and validates TaskEntryModel."""
+
+    @classmethod
+    def entity_classes_to_map_over(cls):
+        return [improvements_models.TaskEntryModel]
+
+
+class PlaythroughModelAuditOneOffJob(ProdValidationAuditOneOffJob):
+    """Job that audits and validates PlaythroughModel."""
+
+    @classmethod
+    def entity_classes_to_map_over(cls):
+        return [stats_models.PlaythroughModel]
