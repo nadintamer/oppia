@@ -185,6 +185,8 @@ import { DragAndDropSortInputValidationService } from
   'interactions/DragAndDropSortInput/directives/drag-and-drop-sort-input-validation.service';
 import { EditableCollectionBackendApiService } from
   'domain/collection/editable-collection-backend-api.service';
+import { EditableExplorationBackendApiService } from
+  'domain/exploration/editable-exploration-backend-api.service';
 import { EditabilityService } from 'services/editability.service';
 import { EditorFirstTimeEventsService } from
   'pages/exploration-editor-page/services/editor-first-time-events.service';
@@ -454,6 +456,8 @@ import { ReadOnlyCollectionBackendApiService } from
   'domain/collection/read-only-collection-backend-api.service';
 import { RatingComputationService } from
   'components/ratings/rating-computation/rating-computation.service';
+import { ReadOnlyExplorationBackendApiService } from
+  'domain/exploration/read-only-exploration-backend-api.service.ts';
 import { ReadOnlyStoryNodeObjectFactory } from
   'domain/story_viewer/ReadOnlyStoryNodeObjectFactory';
 import { ReadOnlySubtopicPageObjectFactory } from
@@ -721,6 +725,7 @@ export class OppiaAngularRootComponent implements AfterViewInit {
   static dragAndDropSortInputRulesService: DragAndDropSortInputRulesService;
   static dragAndDropSortInputValidationService: DragAndDropSortInputValidationService;
   static editableCollectionBackendApiService: EditableCollectionBackendApiService;
+  static editableExplorationBackendApiService: EditableExplorationBackendApiService;
   static editabilityService: EditabilityService;
   static editorFirstTimeEventsService: EditorFirstTimeEventsService;
   static emailDashboardBackendApiService: EmailDashboardBackendApiService;
@@ -858,6 +863,7 @@ export class OppiaAngularRootComponent implements AfterViewInit {
   static questionSummaryObjectFactory: QuestionSummaryObjectFactory;
   static readOnlyCollectionBackendApiService: ReadOnlyCollectionBackendApiService;
   static ratingComputationService: RatingComputationService;
+  static readOnlyExplorationBackendApiService: ReadOnlyExplorationBackendApiService;
   static readOnlyStoryNodeObjectFactory: ReadOnlyStoryNodeObjectFactory;
   static readOnlySubtopicPageObjectFactory: ReadOnlySubtopicPageObjectFactory;
   static readOnlyTopicObjectFactory: ReadOnlyTopicObjectFactory;
@@ -1024,6 +1030,7 @@ private documentAttributeCustomizationService: DocumentAttributeCustomizationSer
 private dragAndDropSortInputRulesService: DragAndDropSortInputRulesService,
 private dragAndDropSortInputValidationService: DragAndDropSortInputValidationService,
 private editableCollectionBackendApiService: EditableCollectionBackendApiService,
+private editableExplorationBackendApiService: EditableExplorationBackendApiService,
 private editabilityService: EditabilityService,
 private editorFirstTimeEventsService: EditorFirstTimeEventsService,
 private emailDashboardBackendApiService: EmailDashboardBackendApiService,
@@ -1161,6 +1168,7 @@ private questionSummaryForOneSkillObjectFactory: QuestionSummaryForOneSkillObjec
 private questionSummaryObjectFactory: QuestionSummaryObjectFactory,
 private readOnlyCollectionBackendApiService: ReadOnlyCollectionBackendApiService,
 private ratingComputationService: RatingComputationService,
+private readOnlyExplorationBackendApiService: ReadOnlyExplorationBackendApiService,
 private readOnlyStoryNodeObjectFactory: ReadOnlyStoryNodeObjectFactory,
 private readOnlySubtopicPageObjectFactory: ReadOnlySubtopicPageObjectFactory,
 private readOnlyTopicObjectFactory: ReadOnlyTopicObjectFactory,
@@ -1328,6 +1336,7 @@ private writtenTranslationsObjectFactory: WrittenTranslationsObjectFactory
     OppiaAngularRootComponent.dragAndDropSortInputRulesService = this.dragAndDropSortInputRulesService;
     OppiaAngularRootComponent.dragAndDropSortInputValidationService = this.dragAndDropSortInputValidationService;
     OppiaAngularRootComponent.editableCollectionBackendApiService = this.editableCollectionBackendApiService;
+    OppiaAngularRootComponent.editableExplorationBackendApiService = this.editableExplorationBackendApiService;
     OppiaAngularRootComponent.editabilityService = this.editabilityService;
     OppiaAngularRootComponent.editorFirstTimeEventsService = this.editorFirstTimeEventsService;
     OppiaAngularRootComponent.emailDashboardBackendApiService = this.emailDashboardBackendApiService;
@@ -1465,6 +1474,7 @@ private writtenTranslationsObjectFactory: WrittenTranslationsObjectFactory
     OppiaAngularRootComponent.questionSummaryObjectFactory = this.questionSummaryObjectFactory;
     OppiaAngularRootComponent.readOnlyCollectionBackendApiService = this.readOnlyCollectionBackendApiService;
     OppiaAngularRootComponent.ratingComputationService = this.ratingComputationService;
+    OppiaAngularRootComponent.readOnlyExplorationBackendApiService = this.readOnlyExplorationBackendApiService;
     OppiaAngularRootComponent.readOnlyStoryNodeObjectFactory = this.readOnlyStoryNodeObjectFactory;
     OppiaAngularRootComponent.readOnlySubtopicPageObjectFactory = this.readOnlySubtopicPageObjectFactory;
     OppiaAngularRootComponent.readOnlyTopicObjectFactory = this.readOnlyTopicObjectFactory;
