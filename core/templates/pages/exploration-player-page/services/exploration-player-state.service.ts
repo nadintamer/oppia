@@ -82,6 +82,9 @@ angular.module('oppia').factory('ExplorationPlayerStateService', [
         .loadExploration(explorationId, version)
         .then(function(exploration) {
           version = exploration.version;
+          // TODO(#8521): Remove the use of $rootScope.$apply()
+          // once the controller is migrated to angular.
+          $rootScope.$apply();
         });
     }
 
@@ -219,6 +222,9 @@ angular.module('oppia').factory('ExplorationPlayerStateService', [
           setExplorationMode();
           initializeExplorationServices(explorationData, false, callback);
         }
+        // TODO(#8521): Remove the use of $rootScope.$apply()
+        // once the controller is migrated to angular.
+        $rootScope.$apply();
       });
     };
 
