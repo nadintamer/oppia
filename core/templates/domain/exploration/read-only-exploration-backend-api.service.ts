@@ -25,12 +25,40 @@ import cloneDeep from 'lodash/cloneDeep';
 
 import { AppConstants } from
   'app.constants';
-import { Exploration, ExplorationObjectFactory} from
+import { Exploration, ExplorationObjectFactory, IExplorationBackendDict } from
   'domain/exploration/ExplorationObjectFactory';
-import { IReadOnlyExplorationBackendDict, ReadOnlyExplorationResponseObjectFactory } from
-  'domain/exploration/ReadOnlyExplorationResponseObjectFactory';
+import { IBackendStateClassifierMapping } from
+  'pages/exploration-player-page/services/state-classifier-mapping.service.ts';
 import { UrlInterpolationService } from
   'domain/utilities/url-interpolation.service';
+
+interface ReadOnlyExplorationDataBackendDict {
+  'can_edit': boolean;
+  'exploration': IExplorationBackendDict;
+  'exploration_id': string;
+  'is_logged_in': boolean;
+  'session_id': string;
+  'version': number;
+  'preferred_audio_language_code': string;
+  'state_classifier_mapping': IBackendStateClassifierMapping,
+  'auto_tts_enabled': boolean;
+  'correctness_feedback_enabled': boolean;
+  'record_playthrough_probability': number;
+}
+
+interface ReadOnlyExplorationData {
+  canEdit: boolean;
+  exploration: Exploration;
+  explorationId: string;
+  isLoggedIn: boolean;
+  sessionId: string;
+  version: number;
+  preferredAudioLanguageCode: string;
+  stateClassifierMapping: IBackendStateClassifierMapping;
+  autoTtsEnabled: boolean;
+  correctnessFeedbackEnabled: boolean;
+  recordPlaythroughProbability: number;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -51,15 +79,27 @@ export class ReadOnlyExplorationBackendApiService {
       errorCallback: (reason?: string) => void): void {
     var explorationDataUrl = this._getExplorationUrl(explorationId, version);
 
-    this.http.get<IReadOnlyExplorationBackendDict>(explorationDataUrl).toPromise()
-      .then(response => {
-        var exploration = cloneDeep(response);
-        var explorationObject = this.explorationObjectFactory.createFromBackendDict(exploration);
-        console.log(explorationObject);
-        if (successCallback) {
-          successCallback(exploration);
-        }
-     }, errorResponse => {
+    this.http.get<ReadOnlyExplorationDataBackendDict>(
+      explorationDataUrl).toPromise().then(response => {
+      var readOnlyExplorationData = {
+        canEdit: response.can_edit,
+        exploration: this.explorationObjectFactory.createFromBackendDict(
+          response.exploration),
+        explorationId: response.exploration_id,
+        isLoggedIn: response.is_logged_in,
+        sessionId: response.session_id,
+        version: response.version,
+        preferredAudioLanguageCode: response.preferred_audio_language_code,
+        stateClassifierMapping: response.state_classifier_mapping,
+        autoTtsEnabled: response.auto_tts_enabled,
+        correctnessFeedbackEnabled: response.correctness_feedback_enabled,
+        recordPlaythroughProbability: response.record_playthrough_probability
+      };
+
+      if (successCallback) {
+        successCallback(readOnlyExplorationData);
+      }
+    }, errorResponse => {
       if (errorCallback) {
         errorCallback(errorResponse.error);
       }
@@ -79,9 +119,9 @@ export class ReadOnlyExplorationBackendApiService {
         });
     }
     return this.urlInterpolation.interpolateUrl(
-        AppConstants.EXPLORATION_DATA_URL_TEMPLATE, {
-          exploration_id: explorationId
-        }
+      AppConstants.EXPLORATION_DATA_URL_TEMPLATE, {
+        exploration_id: explorationId
+      }
     );
   }
 
@@ -96,7 +136,8 @@ export class ReadOnlyExplorationBackendApiService {
     * is called instead, if present. The rejection callback function is
     * passed any data returned by the backend in the case of an error.
     */
-  fetchExploration(explorationId: string, version: number) {
+  fetchExploration(explorationId: string, version: number) :
+      Promise<ReadOnlyExplorationData> {
     return new Promise((resolve, reject) => {
       this._fetchExploration(explorationId, version, resolve, reject);
     });
@@ -112,7 +153,8 @@ export class ReadOnlyExplorationBackendApiService {
     * will store the exploration in the cache to avoid requests from the
     * backend in further function calls.
     */
-  loadLatestExploration(explorationId: string) {
+  loadLatestExploration(explorationId: string) :
+      Promise<ReadOnlyExplorationData> {
     return new Promise((resolve, reject) => {
       if (this._isCached(explorationId)) {
         if (resolve) {
@@ -127,7 +169,7 @@ export class ReadOnlyExplorationBackendApiService {
           }
         }, reject);
       }
-    }
+    });
   }
 
   /**
@@ -137,7 +179,8 @@ export class ReadOnlyExplorationBackendApiService {
     * cache. All previous data in the cache will still be retained after
     * this call.
     */
-  loadExploration(explorationId: string, version: number) : Promise<Object> {
+  loadExploration(explorationId: string, version: number) :
+      Promise<ReadOnlyExplorationData> {
     return new Promise((resolve, reject) => {
       this._fetchExploration(explorationId, version, (exploration) => {
         if (resolve) {

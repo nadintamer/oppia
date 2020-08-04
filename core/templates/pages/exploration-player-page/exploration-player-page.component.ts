@@ -35,10 +35,10 @@ require('objects/objectComponentsRequiresForPlayers.ts');
 angular.module('oppia').component('explorationPlayerPage', {
   template: require('./exploration-player-page.component.html'),
   controller: [
-    '$rootScope', 'ContextService', 'PageTitleService',
-    'ReadOnlyExplorationBackendApiService'
+    'ContextService', 'PageTitleService',
+    'ReadOnlyExplorationBackendApiService',
     function(
-        $rootScope, ContextService, PageTitleService,
+        ContextService, PageTitleService,
         ReadOnlyExplorationBackendApiService) {
       var ctrl = this;
       ctrl.$onInit = function() {
@@ -56,9 +56,6 @@ angular.module('oppia').component('explorationPlayerPage', {
               'content', response.exploration.title);
             angular.element('meta[property="og:description"]').attr(
               'content', response.exploration.objective);
-            // TODO(#8521): Remove the use of $rootScope.$apply()
-            // once the controller is migrated to angular.
-            $rootScope.$apply();
           });
       };
     }

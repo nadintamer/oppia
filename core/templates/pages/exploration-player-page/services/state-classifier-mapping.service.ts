@@ -22,7 +22,7 @@ import { Injectable } from '@angular/core';
 import { Classifier, ClassifierObjectFactory } from
   'domain/classifier/ClassifierObjectFactory';
 
-interface IBackendStateClassifierMapping {
+export interface IBackendStateClassifierMapping {
   [state: string]: {
     'algorithm_id': string;
     'classifier_data': IClassifierData;

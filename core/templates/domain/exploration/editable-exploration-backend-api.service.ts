@@ -22,6 +22,8 @@ import { HttpClient } from '@angular/common/http';
 
 import { AppConstants } from
   'app.constants';
+import { Exploration, ExplorationObjectFactory, IExplorationBackendDict } from
+  'domain/exploration/ExplorationObjectFactory';
 import { ReadOnlyExplorationBackendApiService } from
   'domain/exploration/read-only-exploration-backend-api.service';
 import { UrlInterpolationService } from
@@ -34,6 +36,7 @@ import cloneDeep from 'lodash/cloneDeep';
 })
 export class EditableExplorationBackendApiService {
   constructor(
+  	private explorationObjectFactory: ExplorationObjectFactory,
     private http: HttpClient,
     private readOnlyExploration: ReadOnlyExplorationBackendApiService,
     private urlInterpolation: UrlInterpolationService) {}
@@ -46,8 +49,10 @@ export class EditableExplorationBackendApiService {
     var editableExplorationDataUrl = this._getExplorationUrl(
       explorationId, applyDraft);
 
-    this.http.get(editableExplorationDataUrl).toPromise().then(response => {
+    this.http.get<IExplorationBackendDict>(
+    	editableExplorationDataUrl).toPromise().then(response => {
       var exploration = cloneDeep(response);
+
       if (successCallback) {
         successCallback(exploration);
       }

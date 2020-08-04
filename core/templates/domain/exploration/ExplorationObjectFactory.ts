@@ -17,17 +17,6 @@
  * domain objects.
  */
 
-export interface IExplorationBackendDict {
-  'init_state_name': string,
-  'param_changes': any,
-  'param_specs': any,
-  states: any,
-  title: string,
-  'language_code': string,
-  logger: LoggerService,
-  urlInterpolationService: UrlInterpolationService
-}
-
 import { downgradeInjectable } from '@angular/upgrade/static';
 import { Injectable } from '@angular/core';
 
@@ -60,7 +49,7 @@ import { Voiceover } from 'domain/exploration/VoiceoverObjectFactory';
 
 const INTERACTION_SPECS = require('interactions/interaction_specs.json');
 
-interface IExplorationBackendDict {
+export interface IExplorationBackendDict {
   'init_state_name': string;
   'param_changes': IParamChangeBackendDict[];
   'param_specs': IParamSpecsBackendDict;

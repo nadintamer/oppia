@@ -26,30 +26,46 @@ import { ExplorationObjectFactory} from
   'domain/exploration/ExplorationObjectFactory';
 import { ReadOnlyExplorationBackendApiService } from
   'domain/exploration/read-only-exploration-backend-api.service.ts';
-import { ReadOnlyExplorationResponseObjectFactory } from
-  'domain/exploration/ReadOnlyExplorationResponseObjectFactory';
 import { SubtitledHtmlObjectFactory } from
   'domain/exploration/SubtitledHtmlObjectFactory';
 
 describe('Read only exploration backend API service', () => {
   let readOnlyExplorationBackendApiService:
     ReadOnlyExplorationBackendApiService = null;
+  let explorationObjectFactory: ExplorationObjectFactory = null;
   let subtitledHtmlObjectFactory: SubtitledHtmlObjectFactory = null;
-  let readOnlyExplorationResponseObjectFactory: ReadOnlyExplorationResponseObjectFactory = null;
   let httpTestingController: HttpTestingController;
-  let sampleDataResults = {
+  let sampleDict = {
     exploration_id: '0',
     is_logged_in: true,
     session_id: 'KERH',
+    correctness_feedback_enabled: false,
+    can_edit: false,
+    preferred_audio_language_code: '',
+    auto_tts_enabled: '',
+    record_playthrough_probability: 0,
     exploration: {
       init_state_name: 'Introduction',
+      param_changes: [],
+      param_specs: {},
+      title: '',
+      language_code: '',
       states: {
         Introduction: {
           param_changes: [],
           content: {
             html: '',
-            audio_translations: {}
+            audio_translations: {},
+            content_id: null
           },
+          recorded_voiceovers: {
+            voiceovers_mapping: {}
+          },
+          written_translations: {
+            translations_mapping: {}
+          },
+          classifier_model_id: null,
+          solicit_answer_details: false,
           unresolved_answers: {},
           interaction: {
             customization_args: {},
@@ -59,11 +75,17 @@ describe('Read only exploration backend API service', () => {
               dest: 'Introduction',
               feedback: {
                 html: '',
-                audio_translations: {}
-              }
+                audio_translations: {},
+                content_id: null
+              },
+              labelled_as_correct: null,
+              refresher_exploration_id: null,
+              missing_prerequisite_skill_id: null
             },
+            hints: [],
             confirmed_unclassified_answers: [],
-            id: null
+            id: null,
+            solution: null
           }
         }
       }
@@ -71,6 +93,7 @@ describe('Read only exploration backend API service', () => {
     version: 1,
     state_classifier_mapping: {}
   };
+  let sampleData = null;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -84,7 +107,21 @@ describe('Read only exploration backend API service', () => {
       ReadOnlyExplorationBackendApiService);
     httpTestingController = TestBed.get(HttpTestingController);
     explorationObjectFactory = TestBed.get(ExplorationObjectFactory);
-    readOnlyExplorationResponseObjectFactory = TestBed.get(ReadOnlyExplorationResponseObjectFactory);
+
+    sampleData = {
+      canEdit: sampleDict.can_edit,
+      explorationId: sampleDict.exploration_id,
+      isLoggedIn: sampleDict.is_logged_in,
+      sessionId: sampleDict.session_id,
+      exploration: explorationObjectFactory.createFromBackendDict(
+        sampleDict.exploration),
+      version: sampleDict.version,
+      stateClassifierMapping: sampleDict.state_classifier_mapping,
+      preferredAudioLanguageCode: sampleDict.preferred_audio_language_code,
+      autoTtsEnabled: sampleDict.auto_tts_enabled,
+      correctnessFeedbackEnabled: sampleDict.correctness_feedback_enabled,
+      recordPlaythroughProbability: sampleDict.record_playthrough_probability,
+    };
   });
 
   afterEach(() => {
@@ -100,30 +137,30 @@ describe('Read only exploration backend API service', () => {
         successHandler, failHandler);
       var req = httpTestingController.expectOne('/explorehandler/init/0');
       expect(req.request.method).toEqual('GET');
-      req.flush(sampleDataResults);
+      req.flush(sampleDict);
 
       flushMicrotasks();
 
-      expect(successHandler).toHaveBeenCalledWith(sampleDataResults);
+      expect(successHandler).toHaveBeenCalledWith(sampleData);
       expect(failHandler).not.toHaveBeenCalled();
     }));
 
   it('should successfully fetch an existing exploration with version from' +
     ' the backend', fakeAsync(() => {
-      let successHandler = jasmine.createSpy('success');
-      let failHandler = jasmine.createSpy('fail');
+    let successHandler = jasmine.createSpy('success');
+    let failHandler = jasmine.createSpy('fail');
 
-      readOnlyExplorationBackendApiService.fetchExploration(
-        '0', 1).then(successHandler, failHandler);
-      var req = httpTestingController.expectOne('/explorehandler/init/0?v=1');
-      expect(req.request.method).toEqual('GET');
-      req.flush(sampleDataResults);
-      
-      flushMicrotasks();
-      
-      expect(successHandler).toHaveBeenCalledWith(sampleDataResults);
-      expect(failHandler).not.toHaveBeenCalled();
-  });
+    readOnlyExplorationBackendApiService.fetchExploration(
+      '0', 1).then(successHandler, failHandler);
+    var req = httpTestingController.expectOne('/explorehandler/init/0?v=1');
+    expect(req.request.method).toEqual('GET');
+    req.flush(sampleDict);
+
+    flushMicrotasks();
+
+    expect(successHandler).toHaveBeenCalledWith(sampleData);
+    expect(failHandler).not.toHaveBeenCalled();
+  }));
 
   it('should load a cached exploration after fetching it from the backend',
     fakeAsync(() => {
@@ -137,20 +174,20 @@ describe('Read only exploration backend API service', () => {
         successHandler, failHandler);
       var req = httpTestingController.expectOne('/explorehandler/init/0');
       expect(req.request.method).toEqual('GET');
-      req.flush(sampleDataResults);
+      req.flush(sampleDict);
 
       flushMicrotasks();
 
-      expect(successHandler).toHaveBeenCalledWith(sampleDataResults);
+      expect(successHandler).toHaveBeenCalledWith(sampleData);
       expect(failHandler).not.toHaveBeenCalled();
 
       // Loading a exploration the second time should not fetch it.
-      //readOnlyExplorationBackendApiService.loadExploration('0', null).then(
+      // readOnlyExplorationBackendApiService.loadExploration('0', null).then(
       //  successHandler, failHandler);
       readOnlyExplorationBackendApiService.loadLatestExploration('0').then(
         successHandler, failHandler);
 
-      expect(successHandler).toHaveBeenCalledWith(sampleDataResults);
+      expect(successHandler).toHaveBeenCalledWith(sampleData);
       expect(failHandler).not.toHaveBeenCalled();
     }));
 
@@ -187,11 +224,11 @@ describe('Read only exploration backend API service', () => {
         successHandler, failHandler);
       var req = httpTestingController.expectOne('/explorehandler/init/0');
       expect(req.request.method).toEqual('GET');
-      req.flush(sampleDataResults);
+      req.flush(sampleDict);
 
       flushMicrotasks();
 
-      expect(successHandler).toHaveBeenCalledWith(sampleDataResults);
+      expect(successHandler).toHaveBeenCalledWith(sampleData);
       expect(failHandler).not.toHaveBeenCalled();
 
       // The exploration should now be cached.
@@ -199,8 +236,8 @@ describe('Read only exploration backend API service', () => {
 
       // The exploration should be loadable from the cache.
       readOnlyExplorationBackendApiService.loadLatestExploration('0').then(
-      successHandler, failHandler);
-      expect(successHandler).toHaveBeenCalledWith(sampleDataResults);
+        successHandler, failHandler);
+      expect(successHandler).toHaveBeenCalledWith(sampleData);
       expect(failHandler).not.toHaveBeenCalled();
 
       // Resetting the cache will cause another fetch from the backend.
@@ -211,11 +248,11 @@ describe('Read only exploration backend API service', () => {
         successHandler, failHandler);
       var req = httpTestingController.expectOne('/explorehandler/init/0');
       expect(req.request.method).toEqual('GET');
-      req.flush(sampleDataResults);
+      req.flush(sampleDict);
 
       flushMicrotasks();
 
-      expect(successHandler).toHaveBeenCalledWith(sampleDataResults);
+      expect(successHandler).toHaveBeenCalledWith(sampleData);
       expect(failHandler).not.toHaveBeenCalled();
     }));
 
@@ -252,16 +289,16 @@ describe('Read only exploration backend API service', () => {
 
   it('should delete a exploration from cache',
     fakeAsync(() => {
-    expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
+      expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
 
-    readOnlyExplorationBackendApiService.cacheExploration('0', {
-      id: '0',
-      nodes: []
-    });
+      readOnlyExplorationBackendApiService.cacheExploration('0', {
+        id: '0',
+        nodes: []
+      });
 
-    expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(true);
+      expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(true);
 
-    readOnlyExplorationBackendApiService.deleteExplorationFromCache('0');
-    expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
-  }));
+      readOnlyExplorationBackendApiService.deleteExplorationFromCache('0');
+      expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
+    }));
 });
