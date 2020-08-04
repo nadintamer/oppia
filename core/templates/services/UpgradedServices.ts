@@ -415,6 +415,8 @@ import { RatingComputationService } from
   'components/ratings/rating-computation/rating-computation.service';
 import { ReadOnlyCollectionBackendApiService } from
   'domain/collection/read-only-collection-backend-api.service';
+import { ReadOnlyExplorationBackendApiService } from
+  'domain/exploration/read-only-exploration-backend-api.service.ts';
 import { ReadOnlyStoryNodeObjectFactory } from
   'domain/story_viewer/ReadOnlyStoryNodeObjectFactory';
 import { ReadOnlySubtopicPageObjectFactory } from
@@ -1520,6 +1522,13 @@ export class UpgradedServices {
       upgradedServices['ParamSpecsObjectFactory'],
       upgradedServices['StatesObjectFactory'],
       upgradedServices['UrlInterpolationService']);
+
+    // Topological level: 9.
+    upgradedServices['ReadOnlyExplorationBackendApiService'] = 
+      new ReadOnlyExplorationBackendApiService(
+        upgradedServices['ExplorationObjectFactory'],
+        upgradedServices['UrlInterpolationService'],
+        upgradedServices['HttpClient']);
 
     /* eslint-enable dot-notation */
     return upgradedServices;

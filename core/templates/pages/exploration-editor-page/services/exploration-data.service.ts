@@ -153,6 +153,10 @@ angular.module('oppia').factory('ExplorationDataService', [
           LoggerService.info('Retrieved saved exploration data.');
           LoggerService.info(response);
 
+          // TODO(#8521): Remove the use of $rootScope.$apply()
+          // once the controller is migrated to angular.
+          $rootScope.$apply();
+
           return response.exploration;
         });
       },

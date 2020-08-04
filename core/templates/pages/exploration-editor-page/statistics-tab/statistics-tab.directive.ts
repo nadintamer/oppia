@@ -92,6 +92,10 @@ angular.module('oppia').directive('statisticsTab', [
               if (expStats.numActualStarts > 0) {
                 $scope.explorationHasBeenVisited = true;
               }
+
+              // TODO(#8521): Remove the use of $rootScope.$apply()
+              // once the controller is migrated to angular.
+              $rootScope.$apply();
             });
           };
 

@@ -41,11 +41,11 @@ angular.module('oppia').directive('learnerViewInfo', [
       template: require('./learner-view-info.directive.html'),
       controllerAs: '$ctrl',
       controller: [
-        '$http', '$log', '$uibModal', 'ContextService',
+        '$http', '$log', '$uibModal', '$rootScope', 'ContextService',
         'ReadOnlyExplorationBackendApiService', 'UrlInterpolationService',
         'UrlService', 'DEFAULT_TWITTER_SHARE_MESSAGE_EDITOR',
         'EXPLORATION_SUMMARY_DATA_URL_TEMPLATE',
-        function($http, $log, $uibModal, ContextService,
+        function($http, $log, $uibModal, $rootScope, ContextService,
             ReadOnlyExplorationBackendApiService, UrlInterpolationService,
             UrlService, DEFAULT_TWITTER_SHARE_MESSAGE_EDITOR,
             EXPLORATION_SUMMARY_DATA_URL_TEMPLATE) {
@@ -94,6 +94,9 @@ angular.module('oppia').directive('learnerViewInfo', [
               explorationId, UrlService.getExplorationVersionFromUrl())
               .then(function(response) {
                 ctrl.explorationTitle = response.exploration.title;
+                // TODO(#8521): Remove the use of $rootScope.$apply()
+                // once the controller is migrated to angular.
+                $rootScope.$apply();
               });
           };
         }

@@ -25,11 +25,11 @@ require(
   'pages/exploration-editor-page/history-tab/services/version-tree.service.ts');
 
 angular.module('oppia').factory('CompareVersionsService', [
-  '$q', 'ExplorationDataService', 'ExplorationDiffService',
+  '$q', '$rootScope', 'ExplorationDataService', 'ExplorationDiffService',
   'ReadOnlyExplorationBackendApiService',
   'StatesObjectFactory', 'VersionTreeService',
   function(
-      $q, ExplorationDataService, ExplorationDiffService,
+      $q, $rootScope, ExplorationDataService, ExplorationDiffService,
       ReadOnlyExplorationBackendApiService,
       StatesObjectFactory, VersionTreeService) {
     /**
@@ -119,6 +119,11 @@ angular.module('oppia').factory('CompareVersionsService', [
               directionForwards: true
             }]
           );
+
+          // TODO(#8521): Remove the use of $rootScope.$apply()
+          // once the controller is migrated to angular.
+          $rootScope.$apply();
+
           return {
             nodes: diffGraphData.nodes,
             links: diffGraphData.links,
