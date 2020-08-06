@@ -62,7 +62,7 @@ angular.module('oppia').directive('previewTab', [
         'preview-tab.directive.html'),
       controllerAs: '$ctrl',
       controller: [
-        '$q', '$scope', '$timeout', '$uibModal', 'ContextService',
+        '$q', '$scope', '$rootScope', '$timeout', '$uibModal', 'ContextService',
         'EditableExplorationBackendApiService',
         'ExplorationDataService', 'ExplorationEngineService',
         'ExplorationFeaturesService', 'ExplorationInitStateNameService',
@@ -71,7 +71,7 @@ angular.module('oppia').directive('previewTab', [
         'PlayerCorrectnessFeedbackEnabledService', 'StateEditorService',
         'UrlInterpolationService',
         function(
-            $q, $scope, $timeout, $uibModal, ContextService,
+            $q, $scope, $rootScope, $timeout, $uibModal, ContextService,
             EditableExplorationBackendApiService,
             ExplorationDataService, ExplorationEngineService,
             ExplorationFeaturesService, ExplorationInitStateNameService,
@@ -155,6 +155,10 @@ angular.module('oppia').directive('previewTab', [
                 PlayerCorrectnessFeedbackEnabledService.init(
                   returnDict.correctness_feedback_enabled);
                 NumberAttemptsService.reset();
+
+                // TODO(#8521): Remove the use of $rootScope.$apply()
+                // once the controller is migrated to angular.
+                $rootScope.$apply();
               });
             }, 200);
           };

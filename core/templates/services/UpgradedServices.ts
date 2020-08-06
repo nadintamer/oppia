@@ -150,6 +150,10 @@ import { DragAndDropSortInputValidationService } from
   'interactions/DragAndDropSortInput/directives/drag-and-drop-sort-input-validation.service';
 import { EditableCollectionBackendApiService } from
   'domain/collection/editable-collection-backend-api.service';
+import { EditableExplorationBackendApiService } from
+  'domain/exploration/editable-exploration-backend-api.service';
+import { EditableExplorationDataObjectFactory } from
+  'domain/exploration/EditableExplorationDataObjectFactory';
 import { EditabilityService } from 'services/editability.service';
 import { EditorFirstTimeEventsService } from
   'pages/exploration-editor-page/services/editor-first-time-events.service';
@@ -1522,6 +1526,12 @@ export class UpgradedServices {
       upgradedServices['ParamSpecsObjectFactory'],
       upgradedServices['StatesObjectFactory'],
       upgradedServices['UrlInterpolationService']);
+
+    upgradedServices['EditableExplorationDataObjectFactory'] =
+      new EditableExplorationDataObjectFactory(
+        upgradedServices['ParamChangesObjectFactory'],
+        upgradedServices['ParamSpecsObjectFactory'],
+        upgradedServices['StatesObjectFactory']);
 
     // Topological level: 9.
     upgradedServices['ReadOnlyExplorationBackendApiService'] = 

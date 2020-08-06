@@ -24,24 +24,39 @@ import { EditableExplorationBackendApiService } from
   'domain/exploration/editable-exploration-backend-api.service';
 import { ReadOnlyExplorationBackendApiService } from
   'domain/exploration/read-only-exploration-backend-api.service.ts';
+import { EditableExplorationDataObjectFactory } from
+  'domain/exploration/EditableExplorationDataObjectFactory';
 
-describe('Editable exploration backend API service', () => {
+fdescribe('Editable exploration backend API service', () => {
   let editableExplorationBackendApiService:
     EditableExplorationBackendApiService = null;
   let readOnlyExplorationBackendApiService:
     ReadOnlyExplorationBackendApiService = null;
+  let editableExplorationDataObjectFactory:
+    EditableExplorationDataObjectFactory = null;
   let httpTestingController: HttpTestingController;
-  let sampleDataResults = {
+  let sampleDict = {
     exploration_id: '0',
     init_state_name: 'Introduction',
     language_code: 'en',
+    param_changes: [],
+    param_specs: {},
     states: {
       Introduction: {
         param_changes: [],
         content: {
           html: '',
-          audio_translations: {}
+          audio_translations: {},
+          content_id: null
         },
+        recorded_voiceovers: {
+          voiceovers_mapping: {}
+        },
+        written_translations: {
+          translations_mapping: {}
+        },
+        classifier_model_id: null,
+        solicit_answer_details: false,
         unresolved_answers: {},
         interaction: {
           customization_args: {},
@@ -51,11 +66,17 @@ describe('Editable exploration backend API service', () => {
             dest: 'Introduction',
             feedback: {
               html: '',
-              audio_translations: {}
-            }
+              audio_translations: {},
+              content_id: null
+            },
+            labelled_as_correct: null,
+            refresher_exploration_id: null,
+            missing_prerequisite_skill_id: null
           },
+          hints: [],
           confirmed_unclassified_answers: [],
-          id: null
+          id: null,
+          solution: null
         }
       }
     },
@@ -63,16 +84,23 @@ describe('Editable exploration backend API service', () => {
     user_email: 'test@example.com',
     version: 1
   };
+  let sampleData = null;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule]
     });
-    editableExplorationBackendApiService = TestBed.get(
-      EditableExplorationBackendApiService);
+
+    editableExplorationDataObjectFactory = TestBed.get(
+      EditableExplorationDataObjectFactory);
     readOnlyExplorationBackendApiService = TestBed.get(
       ReadOnlyExplorationBackendApiService);
+    editableExplorationBackendApiService = TestBed.get(
+      EditableExplorationBackendApiService);
     httpTestingController = TestBed.get(HttpTestingController);
+
+    sampleData = editableExplorationDataObjectFactory.createFromBackendDict(
+      sampleDict);
   });
 
   afterEach(() => {
@@ -88,11 +116,11 @@ describe('Editable exploration backend API service', () => {
         successHandler, failHandler);
       var req = httpTestingController.expectOne('/createhandler/data/0');
       expect(req.request.method).toEqual('GET');
-      req.flush(sampleDataResults);
+      req.flush(sampleDict);
 
       flushMicrotasks();
 
-      expect(successHandler).toHaveBeenCalledWith(sampleDataResults);
+      expect(successHandler).toHaveBeenCalledWith(sampleData);
       expect(failHandler).not.toHaveBeenCalled();
     }));
 
@@ -107,11 +135,11 @@ describe('Editable exploration backend API service', () => {
       var req = httpTestingController.expectOne(
         '/createhandler/data/0?apply_draft=true');
       expect(req.request.method).toEqual('GET');
-      req.flush(sampleDataResults);
+      req.flush(sampleDict);
 
       flushMicrotasks();
 
-      expect(successHandler).toHaveBeenCalledWith(sampleDataResults);
+      expect(successHandler).toHaveBeenCalledWith(sampleData);
       expect(failHandler).not.toHaveBeenCalled();
     }));
 
@@ -135,20 +163,20 @@ describe('Editable exploration backend API service', () => {
       expect(failHandler).toHaveBeenCalledWith('Error loading exploration 1.');
     }));
 
-  it('should update a exploration after fetching it from the backend',
+  it('should update an exploration after fetching it from the backend',
     fakeAsync(() => {
       let successHandler = jasmine.createSpy('success');
       let failHandler = jasmine.createSpy('fail');
-      var exploration = null;
+      let exploration = null;
 
       // Loading a exploration the first time should fetch it from the backend.
       editableExplorationBackendApiService.fetchExploration('0').then(data => {
         exploration = data;
       });
+
       var req = httpTestingController.expectOne('/createhandler/data/0');
       expect(req.request.method).toEqual('GET');
-      req.flush(sampleDataResults);
-
+      req.flush(sampleDict);
       flushMicrotasks();
 
       exploration.title = 'New Title';
@@ -158,10 +186,12 @@ describe('Editable exploration backend API service', () => {
       editableExplorationBackendApiService.updateExploration(
         exploration.exploration_id, exploration.version,
         exploration.title, []).then(successHandler, failHandler);
+
+      flushMicrotasks();
+
       req = httpTestingController.expectOne('/createhandler/data/0');
       expect(req.request.method).toEqual('PUT');
       req.flush(exploration);
-
       flushMicrotasks();
 
       expect(successHandler).toHaveBeenCalledWith(exploration);
@@ -177,33 +207,33 @@ describe('Editable exploration backend API service', () => {
       readOnlyExplorationBackendApiService.loadLatestExploration('0', null)
         .then(data => {
           exploration = data;
-        });
-      var req = httpTestingController.expectOne('/explorehandler/init/0');
-      expect(req.request.method).toEqual('GET');
-      req.flush(sampleDataResults);
 
-      flushMicrotasks();
+          var req = httpTestingController.expectOne('/explorehandler/init/0');
+          expect(req.request.method).toEqual('GET');
+          req.flush(sampleDict);
 
-      expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(true);
+          flushMicrotasks();
 
+          expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(true);
 
-      exploration.title = 'New Title';
-      exploration.version = '2';
+          exploration.title = 'New Title';
+          exploration.version = '2';
 
-      // Send a request to update exploration
-      editableExplorationBackendApiService.updateExploration(
-        exploration.exploration_id, exploration.version,
-        exploration.title, []).then(successHandler, failHandler);
-      req = httpTestingController.expectOne('/createhandler/data/0');
-      expect(req.request.method).toEqual('PUT');
-      req.flush(exploration);
+          // Send a request to update exploration
+          editableExplorationBackendApiService.updateExploration(
+            exploration.exploration_id, exploration.version,
+            exploration.title, []).then(successHandler, failHandler);
+          req = httpTestingController.expectOne('/createhandler/data/0');
+          expect(req.request.method).toEqual('PUT');
+          req.flush(exploration);
 
-      flushMicrotasks();
+          flushMicrotasks();
 
-      expect(successHandler).toHaveBeenCalledWith(exploration);
-      expect(failHandler).not.toHaveBeenCalled();
+          expect(successHandler).toHaveBeenCalledWith(exploration);
+          expect(failHandler).not.toHaveBeenCalled();
 
-      expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
+          expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
+      });
     }));
 
   it('should delete exploration from the backend',
@@ -214,41 +244,42 @@ describe('Editable exploration backend API service', () => {
 
       editableExplorationBackendApiService.fetchExploration('0').then(data => {
         exploration = data;
+
+        var req = httpTestingController.expectOne('/createhandler/data/0');
+        expect(req.request.method).toEqual('GET');
+        req.flush(sampleDict);
+
+        flushMicrotasks();
+
+        exploration.title = 'New Title';
+        exploration.version = '2';
+
+        // Send a request to update exploration
+        editableExplorationBackendApiService.updateExploration(
+          exploration.exploration_id, exploration.version,
+          'Minor edits', []).then(successHandler, failHandler);
+        req = httpTestingController.expectOne('/createhandler/data/0');
+        expect(req.request.method).toEqual('PUT');
+        req.flush(exploration);
+
+        flushMicrotasks();
+
+        expect(successHandler).toHaveBeenCalledWith(exploration);
+        expect(failHandler).not.toHaveBeenCalled();
+
+        editableExplorationBackendApiService
+          .deleteExploration(exploration.exploration_id)
+          .then(successHandler, failHandler);
+        req = httpTestingController.expectOne('/createhandler/data/0');
+        expect(req.request.method).toEqual('DELETE');
+        req.flush({});
+
+        flushMicrotasks();
+
+        expect(successHandler).toHaveBeenCalledWith({});
+        expect(failHandler).not.toHaveBeenCalled();
+
+        expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
       });
-      var req = httpTestingController.expectOne('/createhandler/data/0');
-      expect(req.request.method).toEqual('GET');
-      req.flush(sampleDataResults);
-
-      flushMicrotasks();
-
-      exploration.title = 'New Title';
-      exploration.version = '2';
-
-      // Send a request to update exploration
-      editableExplorationBackendApiService.updateExploration(
-        exploration.exploration_id, exploration.version,
-        'Minor edits', []).then(successHandler, failHandler);
-      req = httpTestingController.expectOne('/createhandler/data/0');
-      expect(req.request.method).toEqual('PUT');
-      req.flush(exploration);
-
-      flushMicrotasks();
-
-      expect(successHandler).toHaveBeenCalledWith(exploration);
-      expect(failHandler).not.toHaveBeenCalled();
-
-      editableExplorationBackendApiService
-        .deleteExploration(exploration.exploration_id)
-        .then(successHandler, failHandler);
-      req = httpTestingController.expectOne('/createhandler/data/0');
-      expect(req.request.method).toEqual('DELETE');
-      req.flush({});
-
-      flushMicrotasks();
-
-      expect(successHandler).toHaveBeenCalledWith({});
-      expect(failHandler).not.toHaveBeenCalled();
-
-      expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
     }));
 });

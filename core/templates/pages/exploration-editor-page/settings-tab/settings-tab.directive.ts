@@ -325,6 +325,10 @@ angular.module('oppia').directive('settingsTab', [
             });
           };
 
+          // TODO(#8521): Remove the use of $rootScope.$apply()
+          // once the controller is migrated to angular.
+          $rootScope.$apply();
+
           ctrl.unpublishExplorationAsModerator = function() {
             AlertsService.clearWarnings();
 

@@ -138,6 +138,11 @@ angular.module('oppia').factory('ExplorationDataService', [
                   }
                 }
               }
+
+              // TODO(#8521): Remove the use of $rootScope.$apply()
+              // once the controller is migrated to angular.
+              $rootScope.$apply();
+
               return response;
             })['catch'](function(error) {
               errorCallback(error);
@@ -197,6 +202,10 @@ angular.module('oppia').factory('ExplorationDataService', [
             }
           }
         );
+
+      // TODO(#8521): Remove the use of $rootScope.$apply()
+      // once the controller is migrated to angular.
+      $rootScope.$apply();
       }
     };
 

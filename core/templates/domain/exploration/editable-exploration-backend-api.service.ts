@@ -24,6 +24,8 @@ import { AppConstants } from
   'app.constants';
 import { Exploration, ExplorationObjectFactory, IExplorationBackendDict } from
   'domain/exploration/ExplorationObjectFactory';
+import { EditableExplorationDataObjectFactory, IEditableExplorationDataBackendDict } from
+  'domain/exploration/EditableExplorationDataObjectFactory';
 import { ReadOnlyExplorationBackendApiService } from
   'domain/exploration/read-only-exploration-backend-api.service';
 import { UrlInterpolationService } from
@@ -36,7 +38,7 @@ import cloneDeep from 'lodash/cloneDeep';
 })
 export class EditableExplorationBackendApiService {
   constructor(
-  	private explorationObjectFactory: ExplorationObjectFactory,
+  	private editableExplorationDataObjectFactory: EditableExplorationDataObjectFactory,
     private http: HttpClient,
     private readOnlyExploration: ReadOnlyExplorationBackendApiService,
     private urlInterpolation: UrlInterpolationService) {}
@@ -49,12 +51,14 @@ export class EditableExplorationBackendApiService {
     var editableExplorationDataUrl = this._getExplorationUrl(
       explorationId, applyDraft);
 
-    this.http.get<IExplorationBackendDict>(
+    this.http.get<IEditableExplorationDataBackendDict>(
     	editableExplorationDataUrl).toPromise().then(response => {
-      var exploration = cloneDeep(response);
+      var explorationDataDict = cloneDeep(response);
+      var explorationDataObject = this.editableExplorationDataObjectFactory.
+        createFromBackendDict(explorationDataDict);
 
       if (successCallback) {
-        successCallback(exploration);
+        successCallback(explorationDataObject);
       }
     }, errorResponse => {
       if (errorCallback) {
@@ -85,8 +89,7 @@ export class EditableExplorationBackendApiService {
 
         // Delete from the ReadOnlyExplorationBackendApiService's cache
         // As the two versions of the data (learner and editor) now differ
-        this.readOnlyExploration.deleteExplorationFromCache(
-          explorationId, exploration);
+        this.readOnlyExploration.deleteExplorationFromCache(explorationId);
 
         if (successCallback) {
           successCallback(exploration);

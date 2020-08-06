@@ -170,6 +170,10 @@ angular.module('oppia').factory('ExplorationPlayerStateService', [
         PlayerCorrectnessFeedbackEnabledService.init(
           explorationData.correctness_feedback_enabled);
         NumberAttemptsService.reset();
+
+        // TODO(#8521): Remove the use of $rootScope.$apply()
+        // once the controller is migrated to angular.
+        $rootScope.$apply();
       });
     };
 
