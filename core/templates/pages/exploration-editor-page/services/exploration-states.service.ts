@@ -249,8 +249,8 @@ angular.module('oppia').factory('ExplorationStatesService', [
 
     // TODO(sll): Add unit tests for all get/save methods.
     return {
-      init: function(statesBackendDict) {
-        _states = StatesObjectFactory.createFromBackendDict(statesBackendDict);
+      init: function(statesObject) {
+        _states = statesObject;
         // Initialize the solutionValidityService.
         SolutionValidityService.init(_states.getStateNames());
         _states.getStateNames().forEach(function(stateName) {

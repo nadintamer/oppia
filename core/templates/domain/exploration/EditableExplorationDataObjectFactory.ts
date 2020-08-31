@@ -73,7 +73,7 @@ export class EditableExplorationData {
   paramSpecs: ParamSpecs;
   rights: any;
   showStateEditorTutorialOnLoad: boolean;
-  showStateTranslationTutorialOnLoad: boolean,
+  showStateTranslationTutorialOnLoad: boolean;
   states: States;
   tags: string[];
   title: string;

@@ -27,7 +27,7 @@ import { ReadOnlyExplorationBackendApiService } from
 import { EditableExplorationDataObjectFactory } from
   'domain/exploration/EditableExplorationDataObjectFactory';
 
-fdescribe('Editable exploration backend API service', () => {
+describe('Editable exploration backend API service', () => {
   let editableExplorationBackendApiService:
     EditableExplorationBackendApiService = null;
   let readOnlyExplorationBackendApiService:
@@ -184,10 +184,8 @@ fdescribe('Editable exploration backend API service', () => {
 
       // Send a request to update exploration
       editableExplorationBackendApiService.updateExploration(
-        exploration.exploration_id, exploration.version,
+        exploration.explorationId, exploration.version,
         exploration.title, []).then(successHandler, failHandler);
-
-      flushMicrotasks();
 
       req = httpTestingController.expectOne('/createhandler/data/0');
       expect(req.request.method).toEqual('PUT');
@@ -204,36 +202,36 @@ fdescribe('Editable exploration backend API service', () => {
       let failHandler = jasmine.createSpy('fail');
       var exploration = null;
 
-      readOnlyExplorationBackendApiService.loadLatestExploration('0', null)
+      readOnlyExplorationBackendApiService.loadLatestExploration('0')
         .then(data => {
           exploration = data;
-
-          var req = httpTestingController.expectOne('/explorehandler/init/0');
-          expect(req.request.method).toEqual('GET');
-          req.flush(sampleDict);
-
-          flushMicrotasks();
-
-          expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(true);
-
-          exploration.title = 'New Title';
-          exploration.version = '2';
-
-          // Send a request to update exploration
-          editableExplorationBackendApiService.updateExploration(
-            exploration.exploration_id, exploration.version,
-            exploration.title, []).then(successHandler, failHandler);
-          req = httpTestingController.expectOne('/createhandler/data/0');
-          expect(req.request.method).toEqual('PUT');
-          req.flush(exploration);
-
-          flushMicrotasks();
-
-          expect(successHandler).toHaveBeenCalledWith(exploration);
-          expect(failHandler).not.toHaveBeenCalled();
-
-          expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
       });
+
+      var req = httpTestingController.expectOne('/explorehandler/init/0');
+      expect(req.request.method).toEqual('GET');
+      req.flush(sampleDict);
+
+      flushMicrotasks();
+
+      expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(true);
+
+      exploration.title = 'New Title';
+      exploration.version = '2';
+
+      // Send a request to update exploration
+      editableExplorationBackendApiService.updateExploration(
+        exploration.explorationId, exploration.version,
+        exploration.title, []).then(successHandler, failHandler);
+      req = httpTestingController.expectOne('/createhandler/data/0');
+      expect(req.request.method).toEqual('PUT');
+      req.flush(exploration);
+
+      flushMicrotasks();
+
+      expect(successHandler).toHaveBeenCalledWith(exploration);
+      expect(failHandler).not.toHaveBeenCalled();
+
+      expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
     }));
 
   it('should delete exploration from the backend',
@@ -244,42 +242,42 @@ fdescribe('Editable exploration backend API service', () => {
 
       editableExplorationBackendApiService.fetchExploration('0').then(data => {
         exploration = data;
-
-        var req = httpTestingController.expectOne('/createhandler/data/0');
-        expect(req.request.method).toEqual('GET');
-        req.flush(sampleDict);
-
-        flushMicrotasks();
-
-        exploration.title = 'New Title';
-        exploration.version = '2';
-
-        // Send a request to update exploration
-        editableExplorationBackendApiService.updateExploration(
-          exploration.exploration_id, exploration.version,
-          'Minor edits', []).then(successHandler, failHandler);
-        req = httpTestingController.expectOne('/createhandler/data/0');
-        expect(req.request.method).toEqual('PUT');
-        req.flush(exploration);
-
-        flushMicrotasks();
-
-        expect(successHandler).toHaveBeenCalledWith(exploration);
-        expect(failHandler).not.toHaveBeenCalled();
-
-        editableExplorationBackendApiService
-          .deleteExploration(exploration.exploration_id)
-          .then(successHandler, failHandler);
-        req = httpTestingController.expectOne('/createhandler/data/0');
-        expect(req.request.method).toEqual('DELETE');
-        req.flush({});
-
-        flushMicrotasks();
-
-        expect(successHandler).toHaveBeenCalledWith({});
-        expect(failHandler).not.toHaveBeenCalled();
-
-        expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
       });
+
+      var req = httpTestingController.expectOne('/createhandler/data/0');
+      expect(req.request.method).toEqual('GET');
+      req.flush(sampleDict);
+
+      flushMicrotasks();
+
+      exploration.title = 'New Title';
+      exploration.version = '2';
+
+      // Send a request to update exploration
+      editableExplorationBackendApiService.updateExploration(
+        exploration.explorationId, exploration.version,
+        'Minor edits', []).then(successHandler, failHandler);
+      req = httpTestingController.expectOne('/createhandler/data/0');
+      expect(req.request.method).toEqual('PUT');
+      req.flush(exploration);
+
+      flushMicrotasks();
+
+      expect(successHandler).toHaveBeenCalledWith(exploration);
+      expect(failHandler).not.toHaveBeenCalled();
+
+      editableExplorationBackendApiService
+        .deleteExploration(exploration.explorationId)
+        .then(successHandler, failHandler);
+      req = httpTestingController.expectOne('/createhandler/data/0');
+      expect(req.request.method).toEqual('DELETE');
+      req.flush({});
+
+      flushMicrotasks();
+
+      expect(successHandler).toHaveBeenCalledWith({});
+      expect(failHandler).not.toHaveBeenCalled();
+
+      expect(readOnlyExplorationBackendApiService.isCached('0')).toBe(false);
     }));
 });

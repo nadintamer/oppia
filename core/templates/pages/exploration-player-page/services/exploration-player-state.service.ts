@@ -159,7 +159,7 @@ angular.module('oppia').factory('ExplorationPlayerStateService', [
       ]).then(function(combinedData) {
         var explorationData = combinedData[0];
         var featuresData = combinedData[1];
-        if (doesMathExpressionInputInteractionExist(explorationData.states)) {
+        if (doesMathExpressionInputInteractionExist(explorationData.states.getStateObjects())) {
           Guppy.init({
             symbols: ['/third_party/static/guppy-175999/sym/symbols.json',
               oppiaSymbolsUrl]});

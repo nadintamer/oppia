@@ -119,7 +119,7 @@ angular.module('oppia').factory('ExplorationDataService', [
               explorationId).then(function(response) {
               LoggerService.info('Retrieved exploration data.');
               LoggerService.info(response);
-              draftChangeListId = response.draft_change_list_id;
+              draftChangeListId = response.draftChangeListId;
               explorationData.data = response;
               var draft = LocalStorageService.getExplorationDraft(
                 explorationId);
@@ -141,7 +141,7 @@ angular.module('oppia').factory('ExplorationDataService', [
 
               // TODO(#8521): Remove the use of $rootScope.$apply()
               // once the controller is migrated to angular.
-              $rootScope.$apply();
+              // $rootScope.$apply();
 
               return response;
             })['catch'](function(error) {
@@ -160,7 +160,7 @@ angular.module('oppia').factory('ExplorationDataService', [
 
           // TODO(#8521): Remove the use of $rootScope.$apply()
           // once the controller is migrated to angular.
-          $rootScope.$apply();
+          // $rootScope.$apply();
 
           return response.exploration;
         });
@@ -205,7 +205,7 @@ angular.module('oppia').factory('ExplorationDataService', [
 
       // TODO(#8521): Remove the use of $rootScope.$apply()
       // once the controller is migrated to angular.
-      $rootScope.$apply();
+      // $rootScope.$apply();
       }
     };
 

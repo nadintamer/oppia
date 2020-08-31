@@ -42,12 +42,12 @@ angular.module('oppia').directive('statisticsTab', [
         '/pages/exploration-editor-page/statistics-tab/' +
         'statistics-tab.directive.html'),
       controller: [
-        '$scope', '$uibModal', 'AlertsService', 'ComputeGraphService',
+        '$rootScope', '$scope', '$uibModal', 'AlertsService', 'ComputeGraphService',
         'ExplorationDataService', 'ExplorationStatsService',
         'ReadOnlyExplorationBackendApiService', 'StateInteractionStatsService',
         'StatesObjectFactory',
         function(
-            $scope, $uibModal, AlertsService, ComputeGraphService,
+            $rootScope, $scope, $uibModal, AlertsService, ComputeGraphService,
             ExplorationDataService, ExplorationStatsService,
             ReadOnlyExplorationBackendApiService, StateInteractionStatsService,
             StatesObjectFactory) {
@@ -59,12 +59,11 @@ angular.module('oppia').directive('statisticsTab', [
               ExplorationStatsService.getExplorationStats(expId)
             ]).then(responses => {
               const [expResponse, expStats] = responses;
-              const initStateName = expResponse.exploration.init_state_name;
+              const initStateName = expResponse.exploration.initStateName;
               const numNonCompletions = (
                 expStats.numActualStarts - expStats.numCompletions);
 
-              this.states = StatesObjectFactory.createFromBackendDict(
-                expResponse.exploration.states);
+              this.states = expResponse.exploration.states;
               this.expStats = expStats;
 
               $scope.statsGraphData = (

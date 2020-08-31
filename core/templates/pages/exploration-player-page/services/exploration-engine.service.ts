@@ -275,6 +275,8 @@ angular.module('oppia').factory('ExplorationEngineService', [
           autoTtsEnabled, successCallback) {
         answerIsBeingProcessed = false;
         if (_editorPreviewMode) {
+          console.log("exploration dict");
+          console.log(explorationDict);
           exploration = ExplorationObjectFactory.createFromBackendDict(
             explorationDict);
           exploration.setInitialStateName(initStateName);

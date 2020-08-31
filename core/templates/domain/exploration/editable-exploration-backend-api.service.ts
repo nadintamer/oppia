@@ -84,6 +84,7 @@ export class EditableExplorationBackendApiService {
 
     this.http.put(editableExplorationDataUrl, putData).toPromise()
       .then(response => {
+      	console.log(response);
         // The returned data is an updated exploration dict.
         var exploration = cloneDeep(response);
 

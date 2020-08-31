@@ -258,22 +258,22 @@ angular.module('oppia').component('explorationEditorPage', {
           ExplorationCategoryService.init(explorationData.category);
           ExplorationObjectiveService.init(explorationData.objective);
           ExplorationLanguageCodeService.init(
-            explorationData.language_code);
+            explorationData.languageCode);
           ExplorationInitStateNameService.init(
-            explorationData.init_state_name);
+            explorationData.initStateName);
           ExplorationTagsService.init(explorationData.tags);
           ExplorationParamSpecsService.init(
             ParamSpecsObjectFactory.createFromBackendDict(
-              explorationData.param_specs));
+              explorationData.paramSpecs.getParamDict()));
           ExplorationParamChangesService.init(
             ParamChangesObjectFactory.createFromBackendList(
-              explorationData.param_changes));
+              explorationData.paramChanges));
           ExplorationAutomaticTextToSpeechService.init(
-            explorationData.auto_tts_enabled);
+            explorationData.autoTtsEnabled);
           ExplorationCorrectnessFeedbackService.init(
-            explorationData.correctness_feedback_enabled);
+            explorationData.correctnessFeedbackEnabled);
           StateClassifierMappingService.init(
-            explorationData.state_classifier_mapping);
+            explorationData.stateClassifierMapping);
 
           ctrl.explorationTitleService = ExplorationTitleService;
           ctrl.explorationCategoryService = ExplorationCategoryService;
@@ -298,8 +298,8 @@ angular.module('oppia').component('explorationEditorPage', {
             explorationData.rights.community_owned,
             explorationData.rights.viewable_if_private);
           UserEmailPreferencesService.init(
-            explorationData.email_preferences.mute_feedback_notifications,
-            explorationData.email_preferences
+            explorationData.emailPreferences.mute_feedback_notifications,
+            explorationData.emailPreferences
               .mute_suggestion_notifications);
 
           UserExplorationPermissionsService.getPermissionsAsync()
@@ -337,14 +337,14 @@ angular.module('oppia').component('explorationEditorPage', {
           ExplorationWarningsService.updateWarnings();
 
           // Initialize changeList by draft changes if they exist.
-          if (explorationData.draft_changes !== null) {
+          if (explorationData.draftChanges !== null) {
             ChangeListService.loadAutosavedChangeList(
-              explorationData.draft_changes);
+              explorationData.draftChanges);
           }
 
-          if (explorationData.is_version_of_draft_valid === false &&
-              explorationData.draft_changes !== null &&
-              explorationData.draft_changes.length > 0) {
+          if (explorationData.isVersionOfDraftValid === false &&
+              explorationData.draftChanges !== null &&
+              explorationData.draftChanges.length > 0) {
             // Show modal displaying lost changes if the version of draft
             // changes is invalid, and draft_changes is not `null`.
             AutosaveInfoModalsService.showVersionMismatchModal(
@@ -367,10 +367,10 @@ angular.module('oppia').component('explorationEditorPage', {
           }
 
           StateTutorialFirstTimeService.initEditor(
-            explorationData.show_state_editor_tutorial_on_load,
+            explorationData.showStateEditorTutorialOnLoad,
             ctrl.explorationId);
 
-          if (explorationData.show_state_translation_tutorial_on_load) {
+          if (explorationData.showStateTranslationTutorialOnLoad) {
             StateTutorialFirstTimeService
               .markTranslationTutorialNotSeenBefore();
           }

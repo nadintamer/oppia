@@ -31,9 +31,23 @@ import { IBackendStateClassifierMapping } from
   'pages/exploration-player-page/services/state-classifier-mapping.service.ts';
 import { UrlInterpolationService } from
   'domain/utilities/url-interpolation.service';
+import { IParamChangeBackendDict, ParamChange } from
+  'domain/exploration/ParamChangeObjectFactory';
+import { ParamChangesObjectFactory } from
+  'domain/exploration/ParamChangesObjectFactory';
+import { IParamSpecsBackendDict, ParamSpecs, ParamSpecsObjectFactory } from
+  'domain/exploration/ParamSpecsObjectFactory';
+import {
+  IStateObjectsBackendDict,
+  IVoiceoverObjectsDict,
+  States,
+  StatesObjectFactory
+} from 'domain/exploration/StatesObjectFactory';
 
 interface ReadOnlyExplorationDataBackendDict {
+  'auto_tts_enabled': boolean;
   'can_edit': boolean;
+  'correctness_feedback_enabled': boolean;
   'exploration': IExplorationBackendDict;
   'exploration_id': string;
   'is_logged_in': boolean;
@@ -41,8 +55,6 @@ interface ReadOnlyExplorationDataBackendDict {
   'version': number;
   'preferred_audio_language_code': string;
   'state_classifier_mapping': IBackendStateClassifierMapping,
-  'auto_tts_enabled': boolean;
-  'correctness_feedback_enabled': boolean;
   'record_playthrough_probability': number;
 }
 
@@ -81,10 +93,20 @@ export class ReadOnlyExplorationBackendApiService {
 
     this.http.get<ReadOnlyExplorationDataBackendDict>(
       explorationDataUrl).toPromise().then(response => {
+
+      var explorationData = {
+        init_state_name: response.exploration.init_state_name,
+        param_changes: response.exploration.param_changes,
+        param_specs: response.exploration.param_specs,
+        states: response.exploration.states,
+        title: response.exploration.title,
+        language_code: response.exploration.language_code
+      };
+      
       var readOnlyExplorationData = {
         canEdit: response.can_edit,
         exploration: this.explorationObjectFactory.createFromBackendDict(
-          response.exploration),
+          explorationData),
         explorationId: response.exploration_id,
         isLoggedIn: response.is_logged_in,
         sessionId: response.session_id,
