@@ -41,7 +41,7 @@ def _require_valid_version(version_from_payload, skill_version):
             in the backend.
 
     Raises:
-        Exception: Invalid input.
+        Exception. Invalid input.
     """
     if version_from_payload is None:
         raise base.BaseHandler.InvalidInputException(
@@ -176,6 +176,13 @@ class EditableSkillDataHandler(base.BaseHandler):
         _require_valid_version(version, skill.version)
 
         commit_message = self.payload.get('commit_message')
+
+        if (commit_message is not None and
+                len(commit_message) > feconf.MAX_COMMIT_MESSAGE_LENGTH):
+            raise self.InvalidInputException(
+                'Commit messages must be at most %s characters long.'
+                % feconf.MAX_COMMIT_MESSAGE_LENGTH)
+
         change_dicts = self.payload.get('change_dicts')
         change_list = [
             skill_domain.SkillChange(change_dict)
@@ -199,11 +206,9 @@ class EditableSkillDataHandler(base.BaseHandler):
     def delete(self, skill_id):
         """Handles Delete requests."""
         skill_domain.Skill.require_valid_skill_id(skill_id)
-        skill_ids_assigned_to_some_topic = (
-            topic_services.get_all_skill_ids_assigned_to_some_topic())
-        if skill_id in skill_ids_assigned_to_some_topic:
-            raise self.InvalidInputException(
-                'Cannot delete skill that is assigned to a topic.')
+
+        skill_services.remove_skill_from_all_topics(self.user_id, skill_id)
+
         if skill_services.skill_has_associated_questions(skill_id):
             raise self.InvalidInputException(
                 'Please delete all questions associated with this skill '

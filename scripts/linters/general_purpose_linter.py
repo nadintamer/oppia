@@ -21,13 +21,14 @@ from __future__ import unicode_literals  # pylint: disable=import-only-modules
 
 import os
 import re
-import sys
 
 import python_utils
 
+from . import ignored_style_tag_files
 from . import js_ts_linter
-from . import linter_utils
+from . import warranted_angular_security_bypasses
 from .. import common
+from .. import concurrent_task_utils
 
 EXCLUDED_PATHS = (
     'third_party/*', 'build/*', '.git/*', '*.pyc', 'CHANGELOG',
@@ -39,6 +40,7 @@ EXCLUDED_PATHS = (
     'core/tests/release_sources/tmp_unzip.zip', 'scripts/linters/test_files/*',
     'core/tests/release_sources/tmp_unzip.tar.gz',
     'core/templates/combined-tests.spec.ts',
+    'core/templates/css/oppia-material.css',
     '%s/*' % js_ts_linter.COMPILED_TYPESCRIPT_TMP_PATH)
 
 GENERATED_FILE_PATHS = (
@@ -132,6 +134,18 @@ BAD_PATTERNS_JS_AND_TS_REGEXP = [
         'excluded_dirs': ()
     },
     {
+        'regexp': re.compile(r'bypass'),
+        'message': 'The use of the word "bypass" is not allowed, ' +
+                   'particularly with regards to bypassSecurityTrustHTML() ' +
+                   'and similar functions in Angular.',
+        'excluded_files': (
+            warranted_angular_security_bypasses
+            .EXCLUDED_BYPASS_SECURITY_TRUST_FILES),
+        'excluded_dirs': (
+            warranted_angular_security_bypasses
+            .EXCLUDED_BYPASS_SECURITY_TRUST_DIRECTORIES)
+    },
+    {
         'regexp': re.compile(r'\b(ddescribe|fdescribe)\('),
         'message': 'In tests, please use \'describe\' instead of \'ddescribe\''
                    'or \'fdescribe\'',
@@ -181,16 +195,17 @@ BAD_PATTERNS_JS_AND_TS_REGEXP = [
         'excluded_dirs': ()
     },
     {
-        'regexp': re.compile(r'(?!catch\s(\n|.)*throw\s\w+;\n.*})'
-                             r'throw\s\b(\bError|\bTypeError|\bRangeError'
-                             r'\bSyntaxError|\bDimensionError)\('),
+        'regexp': re.compile(
+            r'(?!catch\s(\n|.)*throw\s\w+;\n.*})'
+            r'throw\s\b(\bError|\bTypeError|\bRangeError'
+            r'\bSyntaxError|\bDimensionError)\('),
         'message': 'Please use \'throw new\' instead of \'throw\'',
         'excluded_files': (),
         'excluded_dirs': ()
     },
     {
-        'regexp': re.compile(r'(?!catch\s(\n|.)*throw\s\w+;\n.*})'
-                             r'throw\s\'.*\';'),
+        'regexp': re.compile(
+            r'(?!catch\s(\n|.)*throw\s\w+;\n.*})throw\s\'.*\';'),
         'message': 'Please use '
                    '\'throw new Error\' instead of \'throw\'',
         'excluded_files': (),
@@ -215,7 +230,9 @@ BAD_PATTERNS_JS_AND_TS_REGEXP = [
         'message': 'Please do not use innerHTML property.',
         'excluded_files': (
             'core/templates/Polyfills.ts',
-            'core/templates/filters/translate.pipe.spec.ts'),
+            'core/templates/filters/translate.pipe.spec.ts',
+            'core/templates/components/ck-editor-helpers/' +
+            'ck-editor-copy-content-service.spec.ts'),
         'excluded_dirs': ('core/tests/',)
     },
     {
@@ -229,6 +246,27 @@ BAD_PATTERNS_JS_AND_TS_REGEXP = [
         'excluded_files': (
             'typings/guppy-defs-b5055b963fdbea5c6c1e92dbf58fdaf3ea0cd8ba.d.ts',
             'core/templates/services/UpgradedServices.ts'),
+        'excluded_dirs': ()
+    },
+    {
+        'regexp': re.compile(r'no-explicit-any'),
+        'message': (
+            'Please do not define "any" types. You can refer '
+            'https://github.com/oppia/oppia/wiki/Guide-on-defining-types '
+            'if you\'re having trouble declaring types.'),
+        'excluded_files': (),
+        'excluded_dirs': ()
+    },
+    {
+        'regexp': re.compile(r'\$broadcast'),
+        'message': (
+            'Please do not use $broadcast/$on for propagating events. '
+            'Use @Input/@Output instead.'),
+        'excluded_files': (
+            'core/templates/pages/exploration-editor-page/translation-tab/'
+            'audio-translation-bar/audio-translation-bar.directive.spec.ts',
+            'core/templates/pages/library-page/search-bar/'
+            'search-bar.component.spec.ts'),
         'excluded_dirs': ()
     }
 ]
@@ -289,6 +327,12 @@ BAD_LINE_PATTERNS_HTML_REGEXP = [
                    'using $parent. Use the scope object ' +
                    'for this purpose.',
         'excluded_files': (),
+        'excluded_dirs': ()
+    },
+    {
+        'regexp': re.compile(r'\s+style\s*=\s*'),
+        'message': 'Please do not use inline styling.',
+        'excluded_files': ignored_style_tag_files.EXCLUDED_FILES,
         'excluded_dirs': ()
     }
 ]
@@ -523,11 +567,12 @@ def is_filepath_excluded_for_bad_patterns_check(pattern, filepath):
         filepath: str. Path of the file.
 
     Returns:
-        bool: Whether to exclude the given file from this
+        bool. Whether to exclude the given file from this
         particular pattern check.
     """
-    return (any(filepath.startswith(bad_pattern)
-                for bad_pattern in BAD_PATTERNS[pattern]['excluded_dirs'])
+    return (any(
+        filepath.startswith(bad_pattern)
+        for bad_pattern in BAD_PATTERNS[pattern]['excluded_dirs'])
             or filepath in BAD_PATTERNS[pattern]['excluded_files'])
 
 
@@ -549,13 +594,15 @@ def check_bad_pattern_in_file(filepath, file_content, pattern):
         which set to True if there is bad pattern found else False, whose second
         element is a list of failed messages.
     """
-    summary_messages = []
+    error_messages = []
     failed = False
     regexp = pattern['regexp']
-    if not (any(filepath.startswith(excluded_dir)
-                for excluded_dir in pattern['excluded_dirs'])
-            or any(filepath.endswith(excluded_file)
-                   for excluded_file in pattern['excluded_files'])):
+    if not (any(
+            filepath.startswith(excluded_dir)
+            for excluded_dir in pattern['excluded_dirs'])
+            or any(
+                filepath.endswith(excluded_file)
+                for excluded_file in pattern['excluded_files'])):
         bad_pattern_count = 0
         for line_num, line in enumerate(file_content, 1):
             if line.endswith('\n'):
@@ -565,16 +612,14 @@ def check_bad_pattern_in_file(filepath, file_content, pattern):
             if stripped_line.endswith('disable-bad-pattern-check'):
                 continue
             if regexp.search(stripped_line):
-                summary_message = ('%s --> Line %s: %s' % (
+                error_message = ('%s --> Line %s: %s' % (
                     filepath, line_num, pattern['message']))
-                python_utils.PRINT(summary_message)
-                summary_messages.append(summary_message)
-                python_utils.PRINT('')
+                error_messages.append(error_message)
                 bad_pattern_count += 1
         if bad_pattern_count:
             failed = True
-            return failed, summary_messages
-    return failed, summary_messages
+            return failed, error_messages
+    return failed, error_messages
 
 
 def check_file_type_specific_bad_pattern(filepath, content):
@@ -585,45 +630,38 @@ def check_file_type_specific_bad_pattern(filepath, content):
         content: str. Contents of the file.
 
     Returns:
-        failed: bool. True if there is bad pattern else false.
+        bool. True if there is bad pattern else false.
         total_error_count: int. The number of errors.
     """
-    summary_messages = []
+    error_messages = []
     failed = False
     _, extension = os.path.splitext(filepath)
     pattern = BAD_PATTERNS_MAP.get(extension)
     total_error_count = 0
     if pattern:
         for regexp in pattern:
-            failed, summary_message = check_bad_pattern_in_file(
+            failed, error_message = check_bad_pattern_in_file(
                 filepath, content, regexp)
-            summary_messages.extend(summary_message)
+            error_messages.extend(error_message)
             if failed:
                 total_error_count += 1
     if total_error_count:
         failed = True
-    return failed, total_error_count, summary_messages
+    return failed, total_error_count, error_messages
 
 
 class GeneralPurposeLinter(python_utils.OBJECT):
     """Manages all the common linting functions. As an abstract base class, this
     is not intended to be used directly.
-
-    Attributes:
-        all_filepaths: list(str). The list of filepaths to be linted.
-        parsed_js_files: dict. Contains the content of JS files, after
-            validating and parsing the files.
-        verbose_mode_enabled: bool. True if verbose mode is enabled.
     """
 
-    def __init__(self, files_to_lint, file_cache, verbose_mode_enabled):
+    def __init__(self, files_to_lint, file_cache):
         """Constructs a GeneralPurposeLinter object.
 
         Args:
             files_to_lint: list(str). A list of filepaths to lint.
             file_cache: object(FileCache). Provides thread-safe access to cached
                 file content.
-            verbose_mode_enabled: bool. True if verbose mode is enabled.
         """
         # Set path for node.
         # The path for node is set explicitly, since otherwise the lint
@@ -633,7 +671,6 @@ class GeneralPurposeLinter(python_utils.OBJECT):
 
         self.files_to_lint = files_to_lint
         self.file_cache = file_cache
-        self.verbose_mode_enabled = verbose_mode_enabled
 
     @property
     def all_filepaths(self):
@@ -656,7 +693,7 @@ class GeneralPurposeLinter(python_utils.OBJECT):
         # This boolean list keeps track of the regex matches
         # found in the file.
         pattern_found_list = []
-        summary_messages = []
+        error_messages = []
         file_content = self.file_cache.readlines(filepath)
         for index, regexp_to_check in enumerate(
                 pattern_list):
@@ -678,203 +715,141 @@ class GeneralPurposeLinter(python_utils.OBJECT):
         if pattern_found_list:
             failed = True
             for pattern_found in pattern_found_list:
-                summary_message = ('%s --> %s' % (
+                error_message = ('%s --> %s' % (
                     filepath,
                     pattern_list[pattern_found]['message']))
-                summary_messages.append(summary_message)
-                python_utils.PRINT(summary_message)
+                error_messages.append(error_message)
 
-        return failed, summary_messages
+        return failed, error_messages
 
-    def _check_mandatory_patterns(self):
+    def check_mandatory_patterns(self):
         """This function checks that all files contain the mandatory
         patterns.
         """
-        if self.verbose_mode_enabled:
-            python_utils.PRINT('Starting mandatory patterns check')
-            python_utils.PRINT('----------------------------------------')
-
-        summary_messages = []
+        name = 'Mandatory pattern'
+        error_messages = []
         failed = False
-        stdout = sys.stdout
-        with linter_utils.redirect_stdout(stdout):
-            sets_of_patterns_to_match = [
-                MANDATORY_PATTERNS_REGEXP, MANDATORY_PATTERNS_JS_REGEXP]
-            for filepath in self.all_filepaths:
-                for pattern_list in sets_of_patterns_to_match:
-                    failed, mandatory_summary_messages = (
-                        self._check_for_mandatory_pattern_in_file(
-                            pattern_list, filepath, failed))
-                    summary_messages.extend(mandatory_summary_messages)
+        sets_of_patterns_to_match = [
+            MANDATORY_PATTERNS_REGEXP, MANDATORY_PATTERNS_JS_REGEXP]
+        for filepath in self.all_filepaths:
+            for pattern_list in sets_of_patterns_to_match:
+                failed, mandatory_error_messages = (
+                    self._check_for_mandatory_pattern_in_file(
+                        pattern_list, filepath, failed))
+                error_messages.extend(mandatory_error_messages)
+        return concurrent_task_utils.TaskResult(
+            name, failed, error_messages, error_messages)
 
-            if failed:
-                summary_message = (
-                    '%s Mandatory pattern check failed, see errors above for'
-                    'patterns that should be added.' % (
-                        linter_utils.FAILED_MESSAGE_PREFIX))
-            else:
-                summary_message = (
-                    '%s Mandatory pattern check passed' % (
-                        linter_utils.SUCCESS_MESSAGE_PREFIX))
-            python_utils.PRINT(summary_message)
-
-        python_utils.PRINT('')
-
-        summary_messages.append(summary_message)
-        return summary_messages
-
-    def _check_bad_patterns(self):
+    def check_bad_patterns(self):
         """This function is used for detecting bad patterns."""
-        if self.verbose_mode_enabled:
-            python_utils.PRINT('Starting Pattern Checks')
-            python_utils.PRINT('----------------------------------------')
+        name = 'Bad pattern'
         total_files_checked = 0
         total_error_count = 0
-        summary_messages = []
+        error_messages = []
         all_filepaths = [
             filepath for filepath in self.all_filepaths if not (
                 filepath.endswith('general_purpose_linter.py') or (
                     filepath.endswith('general_purpose_linter_test.py')))]
         failed = False
-        stdout = sys.stdout
-        with linter_utils.redirect_stdout(stdout):
-            for filepath in all_filepaths:
-                file_content = self.file_cache.readlines(filepath)
-                total_files_checked += 1
-                for pattern in BAD_PATTERNS:
-                    if is_filepath_excluded_for_bad_patterns_check(
-                            pattern, filepath):
-                        continue
-                    for line_num, line in enumerate(file_content):
-                        if pattern in line:
-                            failed = True
-                            summary_message = ('%s --> Line %s: %s' % (
-                                filepath, line_num + 1,
-                                BAD_PATTERNS[pattern]['message']))
-                            summary_messages.append(summary_message)
-                            python_utils.PRINT(summary_message)
-                            python_utils.PRINT('')
-                            total_error_count += 1
-
-                for regexp in BAD_PATTERNS_REGEXP:
-                    bad_pattern_check_failed, bad_pattern_summary_messages = (
-                        check_bad_pattern_in_file(
-                            filepath, file_content, regexp))
-                    if bad_pattern_check_failed:
-                        summary_messages.extend(bad_pattern_summary_messages)
+        for filepath in all_filepaths:
+            file_content = self.file_cache.readlines(filepath)
+            total_files_checked += 1
+            for pattern in BAD_PATTERNS:
+                if is_filepath_excluded_for_bad_patterns_check(
+                        pattern, filepath):
+                    continue
+                for line_num, line in enumerate(file_content):
+                    if pattern in line:
+                        failed = True
+                        error_message = ('%s --> Line %s: %s' % (
+                            filepath, line_num + 1,
+                            BAD_PATTERNS[pattern]['message']))
+                        error_messages.append(error_message)
                         total_error_count += 1
 
-                (
-                    file_type_specific_bad_pattern_failed,
-                    temp_count, bad_pattern_summary_messages) = (
-                        check_file_type_specific_bad_pattern(
-                            filepath, file_content))
-                failed = (
-                    failed or file_type_specific_bad_pattern_failed or
-                    bad_pattern_check_failed)
-                total_error_count += temp_count
-                summary_messages.extend(bad_pattern_summary_messages)
+            for regexp in BAD_PATTERNS_REGEXP:
+                bad_pattern_check_failed, bad_pattern_error_messages = (
+                    check_bad_pattern_in_file(
+                        filepath, file_content, regexp))
+                if bad_pattern_check_failed:
+                    error_messages.extend(bad_pattern_error_messages)
+                    total_error_count += 1
 
-                if filepath == 'constants.ts':
-                    for pattern in REQUIRED_STRINGS_CONSTANTS:
-                        if pattern not in file_content:
-                            failed = True
-                            summary_message = ('%s --> %s' % (
-                                filepath,
-                                REQUIRED_STRINGS_CONSTANTS[pattern]['message']))
-                            python_utils.PRINT(summary_message)
-                            summary_messages.append(summary_message)
-                            python_utils.PRINT('')
-                            total_error_count += 1
-            if failed:
-                summary_message = (
-                    '%s Pattern check failed, see errors above '
-                    'for patterns that should be removed.' % (
-                        linter_utils.FAILED_MESSAGE_PREFIX))
-                summary_messages.append(summary_message)
-            else:
-                summary_message = '%s Pattern checks passed' % (
-                    linter_utils.SUCCESS_MESSAGE_PREFIX)
-                summary_messages.append(summary_message)
+            (
+                file_type_specific_bad_pattern_failed,
+                temp_count, bad_pattern_error_messages) = (
+                    check_file_type_specific_bad_pattern(
+                        filepath, file_content))
+            failed = (
+                failed or file_type_specific_bad_pattern_failed or
+                bad_pattern_check_failed)
+            total_error_count += temp_count
+            error_messages.extend(bad_pattern_error_messages)
 
-            python_utils.PRINT('')
-            if total_files_checked == 0:
-                python_utils.PRINT('There are no files to be checked.')
-            else:
-                python_utils.PRINT('(%s files checked, %s errors found)' % (
-                    total_files_checked, total_error_count))
-                python_utils.PRINT(summary_message)
-        return summary_messages
+            if filepath == 'constants.ts':
+                for pattern in REQUIRED_STRINGS_CONSTANTS:
+                    if pattern not in file_content:
+                        failed = True
+                        error_message = ('%s --> %s' % (
+                            filepath,
+                            REQUIRED_STRINGS_CONSTANTS[pattern]['message']))
+                        error_messages.append(error_message)
+                        total_error_count += 1
+        return concurrent_task_utils.TaskResult(
+            name, failed, error_messages, error_messages)
 
-    def _check_newline_at_eof(self):
+    def check_newline_at_eof(self):
         """This function is used to detect newline at the end of file."""
-        if self.verbose_mode_enabled:
-            python_utils.PRINT(
-                'Starting newline at eof check\n'
-                '----------------------------------------')
-        summary_messages = []
+        name = 'Newline at EOF'
+        error_messages = []
         files_to_lint = self.all_filepaths
         failed = False
 
-        with linter_utils.redirect_stdout(sys.stdout):
-            for filepath in files_to_lint:
-                file_content = self.file_cache.readlines(filepath)
-                file_length = len(file_content)
-                if (
-                        file_length >= 1 and
-                        not re.search(r'[^\n]\n', file_content[-1])):
-                    summary_message = (
-                        '%s --> There should be a single newline at the '
-                        'end of file.' % filepath)
-                    summary_messages.append(summary_message)
-                    python_utils.PRINT(summary_message)
-                    failed = True
-
-            if failed:
-                summary_message = (
-                    '%s Newline at the eof check failed.' % (
-                        linter_utils.FAILED_MESSAGE_PREFIX))
-            else:
-                summary_message = (
-                    '%s Newline at the eof check passed.' % (
-                        linter_utils.SUCCESS_MESSAGE_PREFIX))
-            summary_messages.append(summary_message)
-            python_utils.PRINT(summary_message)
-
-        return summary_messages
+        for filepath in files_to_lint:
+            file_content = self.file_cache.readlines(filepath)
+            file_length = len(file_content)
+            if (
+                    file_length >= 1 and
+                    not re.search(r'[^\n]\n', file_content[-1])):
+                error_message = (
+                    '%s --> There should be a single newline at the '
+                    'end of file.' % filepath)
+                error_messages.append(error_message)
+                failed = True
+        return concurrent_task_utils.TaskResult(
+            name, failed, error_messages, error_messages)
 
     def perform_all_lint_checks(self):
         """Perform all the lint checks and returns the messages returned by all
         the checks.
 
         Returns:
-            all_messages: str. All the messages returned by the lint checks.
+            list(TaskResult). A list of TaskResult objects representing the
+            results of the lint checks.
         """
-        mandatory_patterns_messages = self._check_mandatory_patterns()
-        pattern_messages = self._check_bad_patterns()
-        newline_at_eof_messages = self._check_newline_at_eof()
+        if not self.all_filepaths:
+            return [
+                concurrent_task_utils.TaskResult(
+                    'General purpose lint', False, [],
+                    ['There are no files to be checked.'])]
+        task_results = [
+            self.check_mandatory_patterns(), self.check_bad_patterns(),
+            self.check_newline_at_eof()]
+        return task_results
 
-        all_messages = (
-            mandatory_patterns_messages + pattern_messages +
-            newline_at_eof_messages)
-        return all_messages
 
-
-def get_linters(
-        files_to_lint, file_cache, verbose_mode_enabled=False):
+def get_linters(files_to_lint, file_cache):
     """Creates GeneralPurposeLinter object and returns it.
 
     Args:
         files_to_lint: list(str). A list of filepaths to lint.
         file_cache: object(FileCache). Provides thread-safe access to cached
             file content.
-        verbose_mode_enabled: bool. True if verbose mode is enabled.
 
     Returns:
         tuple(GeneralPurposeLinter, None). A 2-tuple of custom and third_party
         linter objects.
     """
-    custom_linter = GeneralPurposeLinter(
-        files_to_lint, file_cache, verbose_mode_enabled)
+    custom_linter = GeneralPurposeLinter(files_to_lint, file_cache)
 
     return custom_linter, None

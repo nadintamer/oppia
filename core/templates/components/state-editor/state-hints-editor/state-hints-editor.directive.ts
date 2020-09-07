@@ -40,12 +40,17 @@ require(
   'state-interaction-id.service.ts');
 require(
   'components/state-editor/state-editor-properties-services/' +
+  'state-next-content-id-index.service');
+require(
+  'components/state-editor/state-editor-properties-services/' +
   'state-solution.service.ts');
 require('filters/format-rte-preview.filter.ts');
 require('services/alerts.service.ts');
 require('services/context.service.ts');
 require('services/editability.service.ts');
 require('services/generate-content-id.service.ts');
+require('services/contextual/window-dimensions.service.ts');
+require('services/external-save.service.ts');
 
 angular.module('oppia').directive('stateHintsEditor', [
   'UrlInterpolationService', function(UrlInterpolationService) {
@@ -53,6 +58,7 @@ angular.module('oppia').directive('stateHintsEditor', [
       restrict: 'E',
       scope: {
         onSaveHints: '=',
+        onSaveNextContentIdIndex: '=',
         onSaveSolution: '=',
         showMarkAllAudioAsNeedingUpdateModalIfRequired: '='
       },
@@ -60,27 +66,24 @@ angular.module('oppia').directive('stateHintsEditor', [
         '/components/state-editor/state-hints-editor/' +
         'state-hints-editor.directive.html'),
       controller: [
-        '$scope', '$rootScope', '$uibModal', '$filter', 'AlertsService',
-        'EditabilityService', 'StateEditorService', 'StateHintsService',
-        'StateInteractionIdService', 'StateSolutionService',
-        'UrlInterpolationService', 'INTERACTION_SPECS',
+        '$filter', '$scope', '$uibModal', 'AlertsService',
+        'EditabilityService', 'ExternalSaveService',
+        'StateEditorService', 'StateHintsService',
+        'StateInteractionIdService', 'StateNextContentIdIndexService',
+        'StateSolutionService',
+        'UrlInterpolationService', 'WindowDimensionsService',
+        'INTERACTION_SPECS',
         function(
-            $scope, $rootScope, $uibModal, $filter, AlertsService,
-            EditabilityService, StateEditorService, StateHintsService,
-            StateInteractionIdService, StateSolutionService,
-            UrlInterpolationService, INTERACTION_SPECS) {
+            $filter, $scope, $uibModal, AlertsService,
+            EditabilityService, ExternalSaveService,
+            StateEditorService, StateHintsService,
+            StateInteractionIdService, StateNextContentIdIndexService,
+            StateSolutionService,
+            UrlInterpolationService, WindowDimensionsService,
+            INTERACTION_SPECS) {
           var ctrl = this;
-          var _getExistingHintsContentIds = function() {
-            var existingContentIds = [];
-            StateHintsService.displayed.forEach(function(hint) {
-              var contentId = hint.hintContent.getContentId();
-              existingContentIds.push(contentId);
-            });
-            return existingContentIds;
-          };
-
           $scope.getHintButtonText = function() {
-            var hintButtonText = '+ Add Hint';
+            var hintButtonText = '+ ADD HINT';
             if ($scope.StateHintsService.displayed) {
               if ($scope.StateHintsService.displayed.length >= 5) {
                 hintButtonText = 'Limit Reached';
@@ -129,23 +132,24 @@ angular.module('oppia').directive('stateHintsEditor', [
             if ($scope.StateHintsService.displayed.length === 5) {
               return;
             }
-            var existingHintsContentIds = _getExistingHintsContentIds();
             AlertsService.clearWarnings();
-            $rootScope.$broadcast('externalSave');
+            ExternalSaveService.onExternalSave.emit();
 
             $uibModal.open({
               templateUrl: UrlInterpolationService.getDirectiveTemplateUrl(
                 '/pages/exploration-editor-page/editor-tab/templates/' +
                 'modal-templates/add-hint-modal.template.html'),
               backdrop: 'static',
-              resolve: {
-                existingHintsContentIds: () => existingHintsContentIds
-              },
+              resolve: {},
+              windowClass: 'add-hint-modal',
               controller: 'AddHintModalController'
             }).result.then(function(result) {
               StateHintsService.displayed.push(result.hint);
               StateHintsService.saveDisplayedValue();
               $scope.onSaveHints(StateHintsService.displayed);
+              StateNextContentIdIndexService.saveDisplayedValue();
+              $scope.onSaveNextContentIdIndex(
+                StateNextContentIdIndexService.displayed);
             }, function() {
               AlertsService.clearWarnings();
             });
@@ -161,14 +165,10 @@ angular.module('oppia').directive('stateHintsEditor', [
               backdrop: true,
               controller: 'ConfirmOrCancelModalController'
             }).result.then(function() {
-              var solutionContentId = StateSolutionService.displayed
-                .explanation.getContentId();
               StateSolutionService.displayed = null;
               StateSolutionService.saveDisplayedValue();
               $scope.onSaveSolution(StateSolutionService.displayed);
 
-              var hintContentId = StateHintsService.displayed[0]
-                .hintContent.getContentId();
               StateHintsService.displayed = [];
               StateHintsService.saveDisplayedValue();
               $scope.onSaveHints(StateHintsService.displayed);
@@ -194,8 +194,6 @@ angular.module('oppia').directive('stateHintsEditor', [
                 StateHintsService.savedMemento.length === 1) {
                 openDeleteLastHintModal();
               } else {
-                var hintContentId = StateHintsService.displayed[index]
-                  .hintContent.getContentId();
                 StateHintsService.displayed.splice(index, 1);
                 StateHintsService.saveDisplayedValue();
                 $scope.onSaveHints(StateHintsService.displayed);
@@ -214,9 +212,15 @@ angular.module('oppia').directive('stateHintsEditor', [
             $scope.onSaveHints(StateHintsService.displayed);
           };
 
+          $scope.toggleHintCard = function() {
+            $scope.hintCardIsShown = !$scope.hintCardIsShown;
+          };
+
           ctrl.$onInit = function() {
             $scope.EditabilityService = EditabilityService;
             $scope.StateHintsService = StateHintsService;
+            $scope.hintCardIsShown = (
+              !WindowDimensionsService.isWindowNarrow());
             StateHintsService.setActiveHintIndex(null);
             $scope.canEdit = EditabilityService.isEditable();
             $scope.getStaticImageUrl = function(imagePath) {
@@ -234,7 +238,7 @@ angular.module('oppia').directive('stateHintsEditor', [
               revert: 100,
               tolerance: 'pointer',
               start: function(e, ui) {
-                $rootScope.$broadcast('externalSave');
+                ExternalSaveService.onExternalSave.emit();
                 StateHintsService.setActiveHintIndex(null);
                 ui.placeholder.height(ui.item.height());
               },

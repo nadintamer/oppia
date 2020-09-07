@@ -66,16 +66,27 @@ class QuestionModel(base_models.VersionedModel):
     # The skill ids linked to this question.
     linked_skill_ids = ndb.StringProperty(
         indexed=True, repeated=True)
+    # The optional misconception ids marked as not relevant to the question.
+    inapplicable_misconception_ids = ndb.StringProperty(
+        indexed=True, repeated=True)
 
     @staticmethod
     def get_deletion_policy():
         """Question should be kept but the creator should be anonymized."""
         return base_models.DELETION_POLICY.LOCALLY_PSEUDONYMIZE
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Model does not contain user data."""
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'question_state_data': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'question_state_data_schema_version':
+                base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'language_code': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'linked_skill_ids': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'inapplicable_misconception_ids':
+                base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
 
     @classmethod
     def has_reference_to_user_id(cls, user_id):
@@ -98,7 +109,7 @@ class QuestionModel(base_models.VersionedModel):
             new_id: int. ID of the new QuestionModel instance.
 
         Raises:
-            Exception: The ID generator for QuestionModel is
+            Exception. The ID generator for QuestionModel is
                 producing too many collisions.
         """
 
@@ -144,7 +155,8 @@ class QuestionModel(base_models.VersionedModel):
 
     @classmethod
     def create(
-            cls, question_state_data, language_code, version, linked_skill_ids):
+            cls, question_state_data, language_code, version, linked_skill_ids,
+            inapplicable_misconception_ids):
         """Creates a new QuestionModel entry.
 
         Args:
@@ -154,12 +166,14 @@ class QuestionModel(base_models.VersionedModel):
                 question is written in.
             version: str. The version of the question.
             linked_skill_ids: list(str). The skill ids linked to the question.
+            inapplicable_misconception_ids: list(str). The optional
+                misconception ids marked as not applicable to the question.
 
         Returns:
             QuestionModel. Instance of the new QuestionModel entry.
 
         Raises:
-            Exception: A model with the same ID already exists.
+            Exception. A model with the same ID already exists.
         """
         instance_id = cls._get_new_id()
         question_model_instance = cls(
@@ -167,7 +181,8 @@ class QuestionModel(base_models.VersionedModel):
             question_state_data=question_state_data,
             language_code=language_code,
             version=version,
-            linked_skill_ids=linked_skill_ids)
+            linked_skill_ids=linked_skill_ids,
+            inapplicable_misconception_ids=inapplicable_misconception_ids)
 
         return question_model_instance
 
@@ -202,10 +217,14 @@ class QuestionSkillLinkModel(base_models.BaseModel):
         """
         return base_models.DELETION_POLICY.KEEP
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Model does not contain user data."""
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'question_id': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'skill_id': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'skill_difficulty': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
 
     @classmethod
     def has_reference_to_user_id(cls, unused_user_id):
@@ -261,6 +280,22 @@ class QuestionSkillLinkModel(base_models.BaseModel):
             skill_difficulty=skill_difficulty
         )
         return question_skill_link_model_instance
+
+    @classmethod
+    def get_total_question_count_for_skill_ids(cls, skill_ids):
+        """Returns the number of questions assigned to the given skill_ids.
+
+        Args:
+            skill_ids: list(str). Skill IDs for which the question count is
+                requested.
+
+        Returns:
+            int. The number of questions assigned to the given skill_ids.
+        """
+        total_question_count = cls.query().filter(
+            cls.skill_id.IN(skill_ids)).count()
+
+        return total_question_count
 
     @classmethod
     def get_question_skill_links_by_skill_ids(
@@ -576,7 +611,6 @@ class QuestionSkillLinkModel(base_models.BaseModel):
         """
         cls.put_multi(question_skill_links)
 
-
     @classmethod
     def delete_multi_question_skill_links(cls, question_skill_links):
         """Deletes multiple question skill links from the datastore.
@@ -607,12 +641,14 @@ class QuestionCommitLogEntryModel(base_models.BaseCommitLogEntryModel):
         """
         return base_models.DELETION_POLICY.KEEP_IF_PUBLIC
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """This model is only stored for archive purposes. The commit log of
         entities is not related to personal user data.
         """
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'question_id': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
 
     @classmethod
     def _get_instance_id(cls, question_id, question_version):
@@ -655,6 +691,12 @@ class QuestionSummaryModel(base_models.BaseModel):
         indexed=True, required=True)
     # The html content for the question.
     question_content = ndb.TextProperty(indexed=False, required=True)
+    # The ID of the interaction.
+    interaction_id = ndb.StringProperty(indexed=True, required=True)
+    # The misconception ids addressed in the question. This includes
+    # tagged misconceptions ids as well as inapplicable misconception
+    # ids in the question.
+    misconception_ids = ndb.StringProperty(indexed=True, repeated=True)
 
     @staticmethod
     def get_deletion_policy():
@@ -663,13 +705,21 @@ class QuestionSummaryModel(base_models.BaseModel):
         """
         return base_models.DELETION_POLICY.LOCALLY_PSEUDONYMIZE
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Model data has already been exported as a part of the QuestionModel
         export_data function, and thus a new export_data function does not
         need to be defined here.
         """
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'question_model_last_updated':
+                base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'question_model_created_on':
+                base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'question_content': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'interaction_id': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'misconception_ids': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
 
     @classmethod
     def has_reference_to_user_id(cls, unused_user_id):

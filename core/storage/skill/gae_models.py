@@ -86,7 +86,7 @@ class SkillModel(base_models.VersionedModel):
     @staticmethod
     def get_deletion_policy():
         """Skill should be kept if it is published."""
-        return base_models.DELETION_POLICY.KEEP_IF_PUBLIC
+        return base_models.DELETION_POLICY.LOCALLY_PSEUDONYMIZE
 
     @classmethod
     def has_reference_to_user_id(cls, user_id):
@@ -104,7 +104,8 @@ class SkillModel(base_models.VersionedModel):
     def get_merged_skills(cls):
         """Returns the skill models which have been merged.
 
-        Returns: list(SkillModel). List of skill models which have been merged.
+        Returns:
+            list(SkillModel). List of skill models which have been merged.
         """
 
         return [skill for skill in cls.query() if (
@@ -139,10 +140,25 @@ class SkillModel(base_models.VersionedModel):
         skill_commit_log_entry.skill_id = self.id
         skill_commit_log_entry.put()
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Model does not contain user data."""
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'description': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'misconceptions_schema_version':
+                base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'rubric_schema_version': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'misconceptions': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'rubrics': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'language_code': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'skill_contents_schema_version':
+                base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'skill_contents': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'prerequisite_skill_ids': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'next_misconception_id': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'superseding_skill_id': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'all_questions_merged': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
 
 
 class SkillCommitLogEntryModel(base_models.BaseCommitLogEntryModel):
@@ -162,7 +178,7 @@ class SkillCommitLogEntryModel(base_models.BaseCommitLogEntryModel):
         """Skill commit log is deleted only if the corresponding collection
         is not public.
         """
-        return base_models.DELETION_POLICY.KEEP_IF_PUBLIC
+        return base_models.DELETION_POLICY.LOCALLY_PSEUDONYMIZE
 
     @classmethod
     def _get_instance_id(cls, skill_id, version):
@@ -178,12 +194,14 @@ class SkillCommitLogEntryModel(base_models.BaseCommitLogEntryModel):
         """
         return 'skill-%s-%s' % (skill_id, version)
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """This model is only stored for archive purposes. The commit log of
         entities is not related to personal user data.
         """
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'skill_id': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
 
 
 class SkillSummaryModel(base_models.BaseModel):
@@ -220,7 +238,7 @@ class SkillSummaryModel(base_models.BaseModel):
     @staticmethod
     def get_deletion_policy():
         """Skill summary should be kept if associated skill is published."""
-        return base_models.DELETION_POLICY.KEEP_IF_PUBLIC
+        return base_models.DELETION_POLICY.LOCALLY_PSEUDONYMIZE
 
     @classmethod
     def has_reference_to_user_id(cls, unused_user_id):
@@ -235,10 +253,19 @@ class SkillSummaryModel(base_models.BaseModel):
         """
         return False
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Model does not contain user data."""
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'description': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'misconception_count': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'worked_examples_count': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'language_code': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'skill_model_last_updated':
+                base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'skill_model_created_on': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'version': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
 
     @classmethod
     def fetch_page(cls, page_size, urlsafe_start_cursor, sort_by):

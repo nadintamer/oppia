@@ -277,6 +277,56 @@ class StateStatsTests(test_utils.GenericTestBase):
         self.assertEqual(state_stats.num_completions_v1, 0)
         self.assertEqual(state_stats.num_completions_v2, 0)
 
+    def test_equality(self):
+        state_stats_a = stats_domain.StateStats.create_default()
+        state_stats_b = stats_domain.StateStats.create_default()
+        state_stats_c = stats_domain.StateStats.create_default()
+
+        self.assertEqual(state_stats_a, state_stats_b)
+        self.assertEqual(state_stats_b, state_stats_c)
+        self.assertEqual(state_stats_a, state_stats_c)
+
+        state_stats_a.total_answers_count_v1 += 1
+        self.assertEqual(state_stats_b, state_stats_c)
+        self.assertNotEqual(state_stats_a, state_stats_b)
+        self.assertNotEqual(state_stats_a, state_stats_c)
+
+        state_stats_b.total_answers_count_v1 += 1
+        state_stats_c.total_answers_count_v1 += 1
+
+        self.assertEqual(state_stats_a, state_stats_b)
+        self.assertEqual(state_stats_b, state_stats_c)
+        self.assertEqual(state_stats_a, state_stats_c)
+
+    def test_equality_with_different_class(self):
+        class DifferentStats(python_utils.OBJECT):
+            """A different class."""
+
+            pass
+
+        state_stats = stats_domain.StateStats.create_default()
+        different_stats = DifferentStats()
+
+        self.assertFalse(state_stats == different_stats)
+
+    def test_hash(self):
+        state_stats = stats_domain.StateStats.create_default()
+        with self.assertRaisesRegexp(TypeError, 'unhashable'):
+            unused_hash = hash(state_stats)
+
+    def test_aggregate_from(self):
+        state_stats = stats_domain.StateStats(
+            100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100)
+        other_state_stats = stats_domain.StateStats(
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+
+        state_stats.aggregate_from(other_state_stats)
+
+        self.assertEqual(
+            state_stats,
+            stats_domain.StateStats(
+                101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111))
+
     def test_to_dict(self):
         state_stats_dict = {
             'total_answers_count_v1': 0,
@@ -658,7 +708,10 @@ class ExplorationIssueTests(test_utils.GenericTestBase):
         super(ExplorationIssueTests, self).setUp()
 
         self.exp_issue = stats_domain.ExplorationIssue(
-            'EarlyQuit', {}, [], 1, True)
+            'EarlyQuit', {
+                'state_name': {'value': ''},
+                'time_spent_in_exp_in_msecs': {'value': 0}
+            }, [], 1, True)
 
     def _dummy_convert_issue_v1_dict_to_v2_dict(self, issue_dict):
         """A test implementation of schema conversion function. It sets all the
@@ -672,7 +725,16 @@ class ExplorationIssueTests(test_utils.GenericTestBase):
         return issue_dict
 
     def test_to_dict(self):
-        exp_issue = stats_domain.ExplorationIssue('EarlyQuit', {}, [], 1, True)
+        exp_issue = stats_domain.ExplorationIssue(
+            'EarlyQuit',
+            {
+                'time_spent_in_exp_in_msecs': {
+                    'value': 0
+                },
+                'state_name': {
+                    'value': ''
+                }
+            }, [], 1, True)
         exp_issue_dict = exp_issue.to_dict()
         expected_customization_args = {
             'time_spent_in_exp_in_msecs': {
@@ -734,7 +796,16 @@ class ExplorationIssueTests(test_utils.GenericTestBase):
 
     def test_update_exp_issue_from_model(self):
         """Test the migration of exploration issue domain objects."""
-        exp_issue = stats_domain.ExplorationIssue('EarlyQuit', {}, [], 1, True)
+        exp_issue = stats_domain.ExplorationIssue(
+            'EarlyQuit',
+            {
+                'time_spent_in_exp_in_msecs': {
+                    'value': 0
+                },
+                'state_name': {
+                    'value': ''
+                }
+            }, [], 1, True)
         exp_issue_dict = exp_issue.to_dict()
         stats_models.ExplorationIssuesModel.create(
             'exp_id', 1, [exp_issue_dict])
@@ -762,7 +833,10 @@ class ExplorationIssueTests(test_utils.GenericTestBase):
 
         # For other issue types, no changes happen during migration.
         exp_issue1 = stats_domain.ExplorationIssue(
-            'MultipleIncorrectSubmissions', {}, [], 1, True)
+            'MultipleIncorrectSubmissions', {
+                'state_name': {'value': ''},
+                'num_times_answered_incorrectly': {'value': 7}
+            }, [], 1, True)
         exp_issue_dict1 = exp_issue1.to_dict()
 
         stats_models.ExplorationIssuesModel.create(
@@ -812,14 +886,20 @@ class ExplorationIssueTests(test_utils.GenericTestBase):
         exp_issues_model = stats_models.ExplorationIssuesModel.get_model(
             'exp_id', 1)
 
-        with self.assertRaises(Exception):
+        with self.assertRaisesRegexp(
+            Exception,
+            r'unsupported operand type\(s\) for \+=: \'NoneType\' and \'int\''):
             stats_services.get_exp_issues_from_model(exp_issues_model)
 
     def test_actual_update_exp_issue_from_model_raises_error(self):
         exp_issue = stats_domain.ExplorationIssue('EarlyQuit', {}, [], 1, True)
         exp_issue_dict = exp_issue.to_dict()
 
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaisesRegexp(
+            NotImplementedError,
+            r'The _convert_issue_v1_dict_to_v2_dict\(\) method is missing from '
+            r'the derived class. It should be implemented in the '
+            r'derived class.'):
             stats_domain.ExplorationIssue.update_exp_issue_from_model(
                 exp_issue_dict)
 
@@ -857,7 +937,6 @@ class ExplorationIssueTests(test_utils.GenericTestBase):
             self.exp_issue.validate()
 
 
-
 class LearnerActionTests(test_utils.GenericTestBase):
     """Tests the LearnerAction domain object."""
 
@@ -865,7 +944,11 @@ class LearnerActionTests(test_utils.GenericTestBase):
         super(LearnerActionTests, self).setUp()
 
         self.learner_action = stats_domain.LearnerAction(
-            'ExplorationStart', {}, 1)
+            'ExplorationStart', {
+                'state_name': {
+                    'value': ''
+                }
+            }, 1)
 
     def _dummy_convert_action_v1_dict_to_v2_dict(self, action_dict):
         """A test implementation of schema conversion function."""
@@ -877,7 +960,13 @@ class LearnerActionTests(test_utils.GenericTestBase):
         return action_dict
 
     def test_to_dict(self):
-        learner_action = stats_domain.LearnerAction('ExplorationStart', {}, 1)
+        learner_action = stats_domain.LearnerAction(
+            'ExplorationStart',
+            {
+                'state_name': {
+                    'value': ''
+                }
+            }, 1)
         learner_action_dict = learner_action.to_dict()
         expected_customization_args = {
             'state_name': {
@@ -997,14 +1086,20 @@ class LearnerActionTests(test_utils.GenericTestBase):
 
         playthrough_model = stats_models.PlaythroughModel.get(playthrough_id)
 
-        with self.assertRaises(Exception):
+        with self.assertRaisesRegexp(
+            Exception,
+            r'unsupported operand type\(s\) for \+=: \'NoneType\' and \'int\''):
             stats_services.get_playthrough_from_model(playthrough_model)
 
     def test_actual_update_learner_action_from_model_raises_error(self):
         learner_action = stats_domain.LearnerAction('ExplorationStart', {}, 1)
         learner_action_dict = learner_action.to_dict()
 
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaisesRegexp(
+            NotImplementedError,
+            r'The _convert_action_v1_dict_to_v2_dict\(\) method is missing from'
+            r' the derived class. It should be implemented in the '
+            r'derived class.'):
             stats_domain.LearnerAction.update_learner_action_from_model(
                 learner_action_dict)
 

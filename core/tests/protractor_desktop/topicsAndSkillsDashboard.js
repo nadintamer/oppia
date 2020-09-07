@@ -53,10 +53,42 @@ describe('Topics and skills dashboard functionality', function() {
     await topicsAndSkillsDashboardPage.get();
   });
 
-  it('should add a new topic to list and delete it', async function() {
+  it('should assign, unassign, create and delete a skill', async function() {
     await topicsAndSkillsDashboardPage.expectNumberOfTopicsToBe(0);
     await topicsAndSkillsDashboardPage.createTopic(
-      'Topic1 TASD', 'Topic 1 description', true);
+      'Topic1 TASD', 'topic-tasd-one', 'Topic 1 description', true);
+
+    await topicsAndSkillsDashboardPage.get();
+    await topicsAndSkillsDashboardPage.expectNumberOfTopicsToBe(1);
+
+    await topicsAndSkillsDashboardPage
+      .createSkillWithDescriptionAndExplanation(
+        'Skill 2', 'Concept card explanation', true);
+    await topicsAndSkillsDashboardPage.get();
+    await topicsAndSkillsDashboardPage.navigateToSkillsTab();
+    await topicsAndSkillsDashboardPage.filterSkillsByStatus(
+      Constants.SKILL_STATUS_UNASSIGNED);
+    await topicsAndSkillsDashboardPage.expectNumberOfSkillsToBe(1);
+    await topicsAndSkillsDashboardPage.assignSkillWithIndexToTopic(0, 0);
+    await topicsAndSkillsDashboardPage.get();
+    await topicsAndSkillsDashboardPage.navigateToSkillsTab();
+
+    await topicsAndSkillsDashboardPage.unassignSkillFromTopicWithIndex(
+      'Skill 2', 0);
+    await topicsAndSkillsDashboardPage.get();
+    await topicsAndSkillsDashboardPage.navigateToSkillsTab();
+    await topicsAndSkillsDashboardPage.filterSkillsByStatus(
+      Constants.SKILL_STATUS_ASSIGNED);
+    await topicsAndSkillsDashboardPage.expectNumberOfSkillsToBe(0);
+    await topicsAndSkillsDashboardPage.resetTopicFilters();
+    await topicsAndSkillsDashboardPage.filterSkillsByStatus(
+      Constants.SKILL_STATUS_UNASSIGNED);
+    await topicsAndSkillsDashboardPage.expectNumberOfSkillsToBe(1);
+    await topicsAndSkillsDashboardPage.resetTopicFilters();
+    await topicsAndSkillsDashboardPage.deleteSkillWithIndex(0);
+    await topicsAndSkillsDashboardPage.get();
+    await topicsAndSkillsDashboardPage.navigateToSkillsTab();
+    await topicsAndSkillsDashboardPage.expectNumberOfSkillsToBe(0);
 
     await topicsAndSkillsDashboardPage.get();
     await topicsAndSkillsDashboardPage.expectNumberOfTopicsToBe(1);
@@ -67,10 +99,10 @@ describe('Topics and skills dashboard functionality', function() {
   it('should filter the topics', async function() {
     await topicsAndSkillsDashboardPage.expectNumberOfTopicsToBe(0);
     await topicsAndSkillsDashboardPage.createTopic(
-      'Alpha TASD', 'Alpha description', true);
+      'Alpha TASD', 'alpha-tasd', 'Alpha description', true);
     await topicsAndSkillsDashboardPage.get();
     await topicsAndSkillsDashboardPage.createTopic(
-      'Beta TASD', 'Beta description', true);
+      'Beta TASD', 'beta-tasd', 'Beta description', true);
 
     await topicsAndSkillsDashboardPage.get();
     await topicsAndSkillsDashboardPage.expectNumberOfTopicsToBe(2);
@@ -96,23 +128,6 @@ describe('Topics and skills dashboard functionality', function() {
     await topicsAndSkillsDashboardPage.expectNumberOfTopicsToBe(2);
   });
 
-  it('should move published skill to skills section and delete it',
-    async function() {
-      await topicsAndSkillsDashboardPage
-        .createSkillWithDescriptionAndExplanation(
-          'Skill 2', 'Concept card explanation', true);
-      await topicsAndSkillsDashboardPage.get();
-      await topicsAndSkillsDashboardPage.navigateToSkillsTab();
-      await topicsAndSkillsDashboardPage.filterSkillsByStatus(
-        Constants.SKILL_STATUS_UNASSIGNED);
-      await topicsAndSkillsDashboardPage.expectNumberOfSkillsToBe(1);
-      await topicsAndSkillsDashboardPage.deleteSkillWithIndex(0);
-
-      await topicsAndSkillsDashboardPage.get();
-      await topicsAndSkillsDashboardPage.navigateToSkillsTab();
-      await topicsAndSkillsDashboardPage.expectNumberOfSkillsToBe(0);
-    });
-
   it('should move skill to a topic', async function() {
     await topicsAndSkillsDashboardPage
       .createSkillWithDescriptionAndExplanation(
@@ -132,7 +147,6 @@ describe('Topics and skills dashboard functionality', function() {
         'Skill to be merged', 'Concept card explanation', false);
     await skillEditorPage.moveToQuestionsTab();
     await skillEditorPage.clickCreateQuestionButton();
-    await skillEditorPage.confirmSkillDifficulty();
     await explorationEditorMainTab.setContent(
       await forms.toRichText('Question 1'));
     await explorationEditorMainTab.setInteraction(

@@ -24,8 +24,10 @@ import collections
 import copy
 
 from core import jobs
+from core.domain import action_registry
 from core.domain import exp_domain
 from core.domain import exp_fetchers
+from core.domain import playthrough_issue_registry
 from core.domain import stats_domain
 from core.domain import stats_jobs_continuous
 from core.domain import stats_services
@@ -59,6 +61,105 @@ def require_non_negative(
         require_non_negative_messages.append(
             'Negative count: exp_id:%s version:%s state:%s %s:%s' % (
                 exp_id, exp_version, state_name, property_name, value))
+
+
+class RegenerateMissingStateStatsOneOffJob(jobs.BaseMapReduceOneOffJobManager):
+    """A one-off job to regenerate individual state-stats in
+    ExplorationStatsModel.
+    """
+
+    REDUCE_KEY_BAD_RENAME = 'ExplorationStatsModel state stats has bad rename'
+    REDUCE_KEY_REGENERATED = 'ExplorationStatsModel state stats regenerated'
+    REDUCE_KEY_OK = 'ExplorationStatsModel with valid state(s)'
+
+    RELEVANT_COMMIT_CMDS = [
+        exp_domain.CMD_ADD_STATE,
+        exp_domain.CMD_RENAME_STATE,
+        exp_domain.CMD_DELETE_STATE,
+        exp_models.ExplorationModel.CMD_REVERT_COMMIT
+    ]
+
+    @staticmethod
+    def entity_classes_to_map_over():
+        return [exp_models.ExplorationModel]
+
+    @staticmethod
+    def map(exp_model):
+        if exp_model.deleted:
+            return
+
+        latest_exp = exp_fetchers.get_exploration_by_id(exp_model.id)
+        exp_versions = list(python_utils.RANGE(1, latest_exp.version + 1))
+
+        all_exps = exp_models.ExplorationModel.get_multi_versions(
+            exp_model.id, exp_versions)
+        all_exp_stats = [
+            None if not model or model.deleted else
+            stats_services.get_exploration_stats_from_model(model)
+            for model in stats_models.ExplorationStatsModel.get_multi_versions(
+                exp_model.id, exp_versions)
+        ]
+        all_exp_version_diffs = [
+            exp_domain.ExplorationVersionsDiff([
+                exp_domain.ExplorationChange(commit_cmd)
+                for commit_cmd in snapshot['commit_cmds']
+                if commit_cmd['cmd'] in (
+                    RegenerateMissingStateStatsOneOffJob.RELEVANT_COMMIT_CMDS)
+            ])
+            for snapshot in exp_models.ExplorationModel.get_snapshots_metadata(
+                exp_model.id, exp_versions)
+        ]
+
+        for index, (exp, version_diff, stats) in enumerate(python_utils.ZIP(
+                all_exps, all_exp_version_diffs, all_exp_stats)):
+            if not exp or not version_diff or not stats:
+                continue
+
+            missing_states = set(exp.states) - set(stats.state_stats_mapping)
+            if not missing_states:
+                yield (RegenerateMissingStateStatsOneOffJob.REDUCE_KEY_OK, 1)
+                continue
+
+            for state_name in missing_states:
+                new_state_stats = stats_domain.StateStats.create_default()
+
+                if (index > 0 and
+                        state_name not in version_diff.added_state_names):
+                    old_state_stats_mapping = (
+                        all_exp_stats[index - 1] and
+                        all_exp_stats[index - 1].state_stats_mapping)
+                    old_state_name = version_diff.new_to_old_state_names.get(
+                        state_name, state_name)
+
+                    if (old_state_stats_mapping and
+                            old_state_name in old_state_stats_mapping):
+                        new_state_stats.aggregate_from(
+                            old_state_stats_mapping[old_state_name])
+                    else:
+                        yield (
+                            RegenerateMissingStateStatsOneOffJob
+                            .REDUCE_KEY_BAD_RENAME, (
+                                '%s.%s: "%s" -> "%s"' % (
+                                    exp.id, exp.version - 1, old_state_name,
+                                    state_name)
+                                ).encode('utf-8'))
+
+                stats.state_stats_mapping[state_name] = new_state_stats
+                yield (
+                    RegenerateMissingStateStatsOneOffJob
+                    .REDUCE_KEY_REGENERATED, (
+                        '%s.%s: %s' % (exp.id, exp.version, state_name)
+                        ).encode('utf-8'))
+
+            stats_services.save_stats_model_transactional(stats)
+
+    @staticmethod
+    def reduce(reduce_key, values):
+        if reduce_key == RegenerateMissingStateStatsOneOffJob.REDUCE_KEY_OK:
+            final_value = len(values)
+        else:
+            final_value = [v.decode('utf-8') for v in values]
+        yield (reduce_key, final_value)
 
 
 class RegenerateMissingV1StatsModelsOneOffJob(
@@ -150,6 +251,16 @@ class RegenerateMissingV1StatsModelsOneOffJob(
                             old_state_name = (
                                 exp_versions_diff.new_to_old_state_names[
                                     state_name])
+                        if old_state_name not in (
+                                prev_exp_stats.state_stats_mapping):
+                            yield (
+                                'ExplorationStatsModel ignored StateStats '
+                                'regeneration due to missing historical data', (
+                                    '%s.%s: %s' % (
+                                        exploration.id, exp_version,
+                                        old_state_name)
+                                    ).encode('utf-8'))
+                            continue
                         # 'pssm' mean 'previous state stats mapping'.
                         pssm = prev_exp_stats.state_stats_mapping[
                             old_state_name]
@@ -221,9 +332,19 @@ class RecomputeStatisticsOneOffJob(jobs.BaseMapReduceOneOffJobManager):
             associated with the map.
 
         Raises:
-            Exception: The item type is wrong.
+            Exception. The item type is wrong.
         """
-        # pylint: disable=too-many-return-statements
+        class_name_to_event_type = {
+            'CompleteExplorationEventLogEntryModel':
+                feconf.EVENT_TYPE_COMPLETE_EXPLORATION,
+            'StateHitEventLogEntryModel': feconf.EVENT_TYPE_STATE_HIT,
+            'StartExplorationEventLogEntryModel':
+                feconf.EVENT_TYPE_START_EXPLORATION,
+            'SolutionHitEventLogEntryModel': feconf.EVENT_TYPE_SOLUTION_HIT,
+            'ExplorationActualStartEventLogEntryModel':
+                feconf.EVENT_TYPE_ACTUAL_START_EXPLORATION
+        }
+
         if isinstance(item, stats_models.StateCompleteEventLogEntryModel):
             return (
                 item.exp_id,
@@ -246,65 +367,37 @@ class RecomputeStatisticsOneOffJob(jobs.BaseMapReduceOneOffJobManager):
                     'created_on': python_utils.UNICODE(item.created_on),
                     'is_feedback_useful': item.is_feedback_useful
                 })
-        elif isinstance(item, stats_models.StateHitEventLogEntryModel):
-            return (
-                item.exploration_id,
-                {
-                    'event_type': feconf.EVENT_TYPE_STATE_HIT,
-                    'version': item.exploration_version,
-                    'state_name': item.state_name,
-                    'id': item.id,
-                    'created_on': python_utils.UNICODE(item.created_on),
-                    'session_id': item.session_id
-                })
-        elif isinstance(item, stats_models.SolutionHitEventLogEntryModel):
-            return (
-                item.exp_id,
-                {
-                    'event_type': feconf.EVENT_TYPE_SOLUTION_HIT,
-                    'version': item.exp_version,
-                    'state_name': item.state_name,
-                    'id': item.id,
-                    'created_on': python_utils.UNICODE(item.created_on),
-                    'session_id': item.session_id
-                })
-        elif isinstance(
-                item, stats_models.StartExplorationEventLogEntryModel):
-            return (
-                item.exploration_id,
-                {
-                    'event_type': feconf.EVENT_TYPE_START_EXPLORATION,
-                    'version': item.exploration_version,
-                    'state_name': item.state_name,
-                    'id': item.id,
-                    'created_on': python_utils.UNICODE(item.created_on),
-                    'session_id': item.session_id
-                })
-        elif isinstance(
-                item, stats_models.ExplorationActualStartEventLogEntryModel):
-            return (
-                item.exp_id,
-                {
-                    'event_type': feconf.EVENT_TYPE_ACTUAL_START_EXPLORATION,
-                    'version': item.exp_version,
-                    'state_name': item.state_name,
-                    'id': item.id,
-                    'created_on': python_utils.UNICODE(item.created_on),
-                    'session_id': item.session_id
-                })
-        elif isinstance(
-                item, stats_models.CompleteExplorationEventLogEntryModel):
-            return (
-                item.exploration_id,
-                {
-                    'event_type': feconf.EVENT_TYPE_COMPLETE_EXPLORATION,
-                    'version': item.exploration_version,
-                    'state_name': item.state_name,
-                    'id': item.id,
-                    'created_on': python_utils.UNICODE(item.created_on),
-                    'session_id': item.session_id
-                })
-        # pylint: enable=too-many-return-statements
+        elif (
+                isinstance(
+                    item, (
+                        stats_models.CompleteExplorationEventLogEntryModel,
+                        stats_models.StartExplorationEventLogEntryModel,
+                        stats_models.StateHitEventLogEntryModel))):
+            event_dict = {
+                'event_type': class_name_to_event_type[
+                    item.__class__.__name__],
+                'version': item.exploration_version,
+                'state_name': item.state_name,
+                'id': item.id,
+                'created_on': python_utils.UNICODE(item.created_on),
+                'session_id': item.session_id
+            }
+            return (item.exploration_id, event_dict)
+
+        elif (
+                isinstance(item, (
+                    stats_models.SolutionHitEventLogEntryModel,
+                    stats_models.ExplorationActualStartEventLogEntryModel))):
+            event_dict = {
+                'event_type': class_name_to_event_type[
+                    item.__class__.__name__],
+                'version': item.exp_version,
+                'state_name': item.state_name,
+                'id': item.id,
+                'created_on': python_utils.UNICODE(item.created_on),
+                'session_id': item.session_id
+            }
+            return (item.exp_id, event_dict)
 
     @staticmethod
     def map(item):
@@ -411,8 +504,9 @@ class RecomputeStatisticsOneOffJob(jobs.BaseMapReduceOneOffJobManager):
                 datastore_stats_for_version.num_starts_v2 = 0
                 datastore_stats_for_version.num_completions_v2 = 0
                 datastore_stats_for_version.num_actual_starts_v2 = 0
-                for state_stats in (list(datastore_stats_for_version.
-                                         state_stats_mapping.values())):
+                for state_stats in list(
+                        datastore_stats_for_version.
+                        state_stats_mapping.values()):
                     state_stats.total_answers_count_v2 = 0
                     state_stats.useful_feedback_count_v2 = 0
                     state_stats.total_hit_count_v2 = 0
@@ -609,7 +703,8 @@ class StatisticsAuditV1(jobs.BaseMapReduceOneOffJobManager):
         """Implements the map function. Must be declared @staticmethod.
 
         Args:
-            item: ExplorationStatsModel.
+            item: ExplorationStatsModel. The Exploration stats model object to
+                fetch its properties.
 
         Yields:
             tuple. For ExplorationStatsModel, a 2-tuple of the form
@@ -785,7 +880,8 @@ class StatisticsAuditV2(jobs.BaseMapReduceOneOffJobManager):
         """Implements the map function. Must be declared @staticmethod.
 
         Args:
-            item: ExplorationStatsModel.
+            item: ExplorationStatsModel. The Exploration stats model object to
+                fetch its properties.
 
         Yields:
             tuple. For ExplorationStatsModel, a 2-tuple of the form
@@ -985,8 +1081,8 @@ class StatisticsAudit(jobs.BaseMapReduceOneOffJobManager):
         """Implements the map function. Must be declared @staticmethod.
 
         Args:
-            item: ExplorationAnnotationsModel or
-                StateCounterModel.
+            item: ExplorationAnnotationsModel or StateCounterModel. The object
+                to fetch its properties.
 
         Yields:
             tuple. Different for different models:
@@ -1151,16 +1247,6 @@ class RegenerateMissingV2StatsModelsOneOffJob(
                 [exp_domain.ExpVersionReference(exp.id, version)
                  for version in python_utils.RANGE(1, exp.version + 1)]))
 
-        if exp.deleted:
-            all_existent_models = [m for m in all_models if m is not None]
-            stats_models.ExplorationStatsModel.delete_multi(all_existent_models)
-            yield (
-                'Deleted all stats', {
-                    'exp_id': exp.id,
-                    'number_of_models': len(all_existent_models)
-                })
-            return
-
         first_missing_version = None
         for version, model in enumerate(all_models):
             if model is None:
@@ -1316,8 +1402,10 @@ class ExplorationMissingStatsAudit(jobs.BaseMapReduceOneOffJobManager):
             else:
                 exp_states = set(exp_model.states)
                 exp_stats_states = set(exp_stats_model.state_stats_mapping)
+                issue_found = False
 
                 for state_name in exp_states - exp_stats_states:
+                    issue_found = True
                     key = '%s:%s:%s' % (
                         exp_id,
                         state_name,
@@ -1330,6 +1418,14 @@ class ExplorationMissingStatsAudit(jobs.BaseMapReduceOneOffJobManager):
                         (exp_model.version, state_version_occurrences))
 
                 for state_name in exp_stats_states - exp_states:
+                    # In early schema versions of ExplorationModel, the END
+                    # card was a persistant, _implicit_ state present in every
+                    # exploration. Because of this, it is not an error for
+                    # stats to exist for END even though it does not appear in
+                    # an exploration's representation.
+                    if state_name == 'END':
+                        continue
+                    issue_found = True
                     key = '%s:%s:%s' % (
                         exp_id,
                         state_name,
@@ -1341,7 +1437,7 @@ class ExplorationMissingStatsAudit(jobs.BaseMapReduceOneOffJobManager):
                         key.encode('utf-8'),
                         (exp_model.version, state_version_occurrences))
 
-                if exp_states == exp_stats_states:
+                if not issue_found:
                     key = ExplorationMissingStatsAudit.STATUS_VALID_KEY
                     yield (key, exp_model.version)
 
@@ -1393,3 +1489,95 @@ class ExplorationMissingStatsAudit(jobs.BaseMapReduceOneOffJobManager):
                     exp_id, status,
                     '' if len(exp_versions_without_stats_as_strs) == 1 else 's',
                     ', '.join(exp_versions_without_stats_as_strs)))
+
+
+class StatisticsCustomizationArgsAudit(jobs.BaseMapReduceOneOffJobManager):
+    """A one-off job to check if all customization arguments stored in
+    Playthrough, and ExplorationIssues are fully populated with
+    the appropriate keys.
+    """
+
+    STATUS_MISMATCH_KEYS = 'missing or extra customization argument key(s)'
+    STATUS_MATCH_KEYS = 'the correct customization argument key(s)'
+
+    JOB_RESULT_EXPECTED = 'EXPECTED'
+    JOB_RESULT_UNEXPECTED = 'UNEXPECTED'
+
+    @classmethod
+    def entity_classes_to_map_over(cls):
+        return [
+            stats_models.ExplorationIssuesModel,
+            stats_models.PlaythroughModel
+        ]
+
+    @staticmethod
+    def map(item):
+        if isinstance(item, stats_models.ExplorationIssuesModel):
+            for issue in item.unresolved_issues:
+                ca_specs = (
+                    playthrough_issue_registry.Registry.get_issue_by_type(
+                        issue['issue_type']).customization_arg_specs)
+                all_ca_names = set([ca_spec.name for ca_spec in ca_specs])
+                if all_ca_names == set(issue['issue_customization_args']):
+                    yield ('ExplorationIssue -- SUCCESS', 1)
+                else:
+                    ca = [
+                        ca_name.encode('utf-8')
+                        for ca_name in issue['issue_customization_args'].keys()
+                    ]
+                    yield (
+                        'ExplorationIssue -- FAILURE',
+                        (
+                            item.exp_id.encode('utf-8'),
+                            issue['issue_type'].encode('utf-8'),
+                            ca
+                        )
+                    )
+        elif isinstance(item, stats_models.PlaythroughModel):
+            ca_specs = playthrough_issue_registry.Registry.get_issue_by_type(
+                item.issue_type).customization_arg_specs
+            all_ca_names = set([ca_spec.name for ca_spec in ca_specs])
+            if all_ca_names == set(item.issue_customization_args):
+                yield ('Playthrough Issue -- SUCCESS', 1)
+            else:
+                ca = [
+                    ca_name.encode('utf-8')
+                    for ca_name in item.issue_customization_args.keys()
+                ]
+                yield (
+                    'Playthrough Issue -- FAILURE',
+                    (
+                        item.exp_id.encode('utf-8'),
+                        item.issue_type.encode('utf-8'),
+                        ca
+                    )
+                )
+
+            for action in item.actions:
+                ca_specs = (
+                    action_registry.Registry.get_action_by_type(
+                        action['action_type']).customization_arg_specs)
+                all_ca_names = set([ca_spec.name for ca_spec in ca_specs])
+                if all_ca_names == set(action['action_customization_args']):
+                    yield ('Playthrough Action -- SUCCESS', 1)
+                else:
+                    ca = [
+                        ca_name.encode('utf-8')
+                        for ca_name in action[
+                            'action_customization_args'].keys()
+                    ]
+                    yield (
+                        'Playthrough Action -- FAILURE',
+                        (
+                            item.exp_id.encode('utf-8'),
+                            action['action_type'].encode('utf-8'),
+                            ca
+                        )
+                    )
+
+    @staticmethod
+    def reduce(key, values):
+        if 'SUCCESS' in key:
+            yield (key, len(values))
+        else:
+            yield (key, values)

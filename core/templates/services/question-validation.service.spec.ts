@@ -78,10 +78,8 @@ describe('Question Validation Service', function() {
               refresher_exploration_id: null
             },
             rule_specs: [{
-              inputs: {
-                x: 10
-              },
-              rule_type: 'Equals'
+              rule_type: 'Equals',
+              inputs: {x: 10}
             }],
             tagged_skill_misconception_id: null
           }, {
@@ -96,15 +94,21 @@ describe('Question Validation Service', function() {
               refresher_exploration_id: null
             },
             rule_specs: [{
-              inputs: {
-                x: 10
-              },
-              rule_type: 'Equals'
+              rule_type: 'Equals',
+              inputs: {x: 10}
             }],
             tagged_skill_misconception_id: 'abc-1'
           }],
           confirmed_unclassified_answers: [],
-          customization_args: {},
+          customization_args: {
+            placeholder: {
+              value: {
+                content_id: 'ca_placeholder_0',
+                unicode_str: ''
+              }
+            },
+            rows: { value: 1 }
+          },
           default_outcome: {
             dest: null,
             feedback: {

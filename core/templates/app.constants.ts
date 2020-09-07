@@ -40,12 +40,8 @@ export class AppConstants {
 
   public static RULE_SUMMARY_WRAP_CHARACTER_COUNT = 30;
 
-  /* Called always when learner moves to a new card.
-     Also called when card is selected by clicking on progress dots */
-  public static EVENT_ACTIVE_CARD_CHANGED = 'activeCardChanged';
   /* Called when the learner moves to a new card that they haven't seen
      before. */
-  public static EVENT_NEW_CARD_OPENED = 'newCardOpened';
   public static EDITABLE_EXPLORATION_DATA_DRAFT_URL_TEMPLATE =
     '/createhandler/data/<exploration_id>?apply_draft=<apply_draft>';
   public static EDITABLE_EXPLORATION_DATA_URL_TEMPLATE =
@@ -54,10 +50,6 @@ export class AppConstants {
     '/explorehandler/init/<exploration_id>';
   public static EXPLORATION_VERSION_DATA_URL_TEMPLATE =
     '/explorehandler/init/<exploration_id>?v=<version>';
-  /* New card is available but user hasn't gone to it yet (when oppia
-     gives a feedback and waits for user to press 'continue.
-     Not called when a card is selected by clicking progress dots */
-  public static EVENT_NEW_CARD_AVAILABLE = 'newCardAvailable';
 
   public static WARNING_TYPES: WARNING_TYPES_CONSTANT = {
     // These must be fixed before the exploration can be saved.
@@ -111,11 +103,16 @@ export class AppConstants {
   // displayed.
   public static FATAL_ERROR_CODES = [400, 401, 404, 500];
 
-  // Do not modify these, for backwards-compatibility reasons.
+  // Do not modify these, for backwards-compatibility reasons. These strings are
+  // used to identify components, to generate content ids, and to determine what
+  // type of content a given content id is associated with. If you wish to
+  // change one of these, a state migration of all existing content ids is
+  // required.
   public static COMPONENT_NAME_CONTENT = 'content';
-  public static COMPONENT_NAME_HINT = 'hint';
-  public static COMPONENT_NAME_SOLUTION = 'solution';
   public static COMPONENT_NAME_FEEDBACK = 'feedback';
+  public static COMPONENT_NAME_HINT = 'hint';
+  public static COMPONENT_NAME_INTERACTION_CUSTOMIZATION_ARGS = 'ca';
+  public static COMPONENT_NAME_SOLUTION = 'solution';
   public static COMPONENT_NAME_EXPLANATION = 'explanation';
   public static COMPONENT_NAME_WORKED_EXAMPLE = {
     QUESTION: 'worked_example_question',
@@ -146,9 +143,6 @@ export class AppConstants {
 
   public static LOGOUT_URL = '/logout';
 
-  public static EVENT_QUESTION_SUMMARIES_INITIALIZED =
-    'questionSummariesInitialized';
-
   // TODO(vojtechjelinek): Move these to separate file later, after we establish
   // process to follow for Angular constants (#6731).
   public static SUBTOPIC_PAGE_EDITOR_DATA_URL_TEMPLATE =
@@ -168,6 +162,11 @@ export class AppConstants {
     SKILL: 'skill',
     STORY: 'story',
     QUESTION: 'question'
+  };
+
+  public static IMAGE_CONTEXT = {
+    EXPLORATION_SUGGESTIONS: 'exploration_suggestions',
+    QUESTION_SUGGESTIONS: 'question_suggestions'
   };
 
   public static IMAGE_SAVE_DESTINATION_SERVER = 'imageSaveDestinationServer';

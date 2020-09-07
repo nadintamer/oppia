@@ -18,7 +18,7 @@
 
 import { downgradeInjectable } from '@angular/upgrade/static';
 import { fromEvent, Observable } from 'rxjs';
-import { HostListener, Injectable } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { WindowRef } from 'services/contextual/window-ref.service';
 
 @Injectable({
@@ -32,9 +32,10 @@ export class WindowDimensionsService {
   }
 
   getWidth(): number {
-    return (this.windowRef.nativeWindow.innerWidth ||
-        this.windowRef.nativeWindow.document.documentElement.clientWidth ||
-        this.windowRef.nativeWindow.document.body.clientWidth);
+    return (
+      this.windowRef.nativeWindow.innerWidth ||
+      this.windowRef.nativeWindow.document.documentElement.clientWidth ||
+      this.windowRef.nativeWindow.document.body.clientWidth);
   }
 
   isWindowNarrow(): boolean {

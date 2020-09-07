@@ -91,7 +91,6 @@ export class EditableExplorationBackendApiService {
         // Delete from the ReadOnlyExplorationBackendApiService's cache
         // As the two versions of the data (learner and editor) now differ
         this.readOnlyExploration.deleteExplorationFromCache(explorationId);
-
         if (successCallback) {
           successCallback(exploration);
         }

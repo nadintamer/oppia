@@ -34,7 +34,6 @@ describe('Create new subtopic modal', function() {
   var $scope = null;
   var ctrl = null;
   var $uibModalInstance = null;
-  var NewlyCreatedTopicObjectFactory = null;
   var TopicObjectFactory = null;
   var SubtopicValidationService = null;
   var topic = null;
@@ -43,8 +42,6 @@ describe('Create new subtopic modal', function() {
 
     $uibModalInstance = jasmine.createSpyObj(
       '$uibModalInstance', ['close', 'dismiss']);
-    NewlyCreatedTopicObjectFactory =
-            $injector.get('NewlyCreatedTopicObjectFactory');
     TopicObjectFactory =
             $injector.get('TopicObjectFactory');
     SubtopicValidationService = $injector.get('SubtopicValidationService');
@@ -58,16 +55,18 @@ describe('Create new subtopic modal', function() {
   }));
 
 
-  it('should init the variables', function() {
-    ctrl.init();
-    expect(ctrl.topic).toEqual(topic);
-    expect(ctrl.SUBTOPIC_PAGE_SCHEMA).toEqual({type: 'html',
-      ui_config: {
-        rows: 100
-      }});
-    expect(ctrl.allowedBgColors).toEqual(['#FFFFFF']);
-    expect(ctrl.MAX_CHARS_IN_SUBTOPIC_TITLE).toEqual(64);
-  });
+  it('should initialize controller properties after its initialization',
+    function() {
+      ctrl.init();
+      expect(ctrl.topic).toEqual(topic);
+      expect(ctrl.SUBTOPIC_PAGE_SCHEMA).toEqual({
+        type: 'html',
+        ui_config: {
+          rows: 100
+        }});
+      expect(ctrl.allowedBgColors).toEqual(['#FFFFFF']);
+      expect(ctrl.MAX_CHARS_IN_SUBTOPIC_TITLE).toEqual(64);
+    });
 
   it('should close the modal and save the subtopicId', function() {
     ctrl.subtopicTitle = 'Subtopic1';
@@ -84,7 +83,8 @@ describe('Create new subtopic modal', function() {
 
   it('should show error message if subtopic name is invalid', function() {
     expect(ctrl.errorMsg).toEqual(null);
-    spyOn(SubtopicValidationService,
+    spyOn(
+      SubtopicValidationService,
       'checkValidSubtopicName').and.returnValue(false);
     ctrl.subtopicTitle = 'Subtopic1';
     ctrl.save();
@@ -95,7 +95,8 @@ describe('Create new subtopic modal', function() {
 
   it('should show reset the error message ', function() {
     expect(ctrl.errorMsg).toEqual(null);
-    spyOn(SubtopicValidationService,
+    spyOn(
+      SubtopicValidationService,
       'checkValidSubtopicName').and.returnValue(false);
     ctrl.subtopicTitle = 'Subtopic1';
     ctrl.save();
@@ -107,13 +108,130 @@ describe('Create new subtopic modal', function() {
     expect(ctrl.errorMsg).toEqual(null);
   });
 
+  it('should check if subtopic with url fragment exists', function() {
+    expect(ctrl.subtopicUrlFragmentExists).toEqual(false);
+    spyOn(
+      SubtopicValidationService,
+      'doesSubtopicWithUrlFragmentExist').and.returnValue(true);
+    ctrl.checkSubtopicExistence();
+    expect(ctrl.subtopicUrlFragmentExists).toEqual(true);
+  });
+
   it('should return the validity of the subtopic', function() {
+    // Fails when all fields are empty.
+    ctrl.editableThumbnailFilename = '';
+    ctrl.subtopicTitle = '';
+    ctrl.htmlData = '';
+    ctrl.editableUrlFragment = '';
     expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when subtopicTitle is empty but other fields are valid.
+    ctrl.htmlData = 'Subtopic description';
+    ctrl.editableThumbnailFilename = 'img_316_512.svg';
+    ctrl.editableUrlFragment = 'subtopic-url';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when editableThumbnailFilename is empty but other fields
+    // are valid.
+    ctrl.editableThumbnailFilename = '';
     ctrl.subtopicTitle = 'Subtopic1';
     expect(ctrl.isSubtopicValid()).toEqual(false);
-    ctrl.htmlData = 'Subtopic description';
-    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when htmlData is empty but other fields are valid.
+    ctrl.htmlData = '';
     ctrl.editableThumbnailFilename = 'img_316_512.svg';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when editableUrlFragment is empty but other fields are valid.
+    ctrl.htmlData = 'Subtopic description';
+    ctrl.editableUrlFragment = '';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when editableUrlFragment contains an invalid character.
+    ctrl.editableUrlFragment = 'ABC 123';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when only editableThumbnailFilename and subtopicTitle are
+    // valid but others are empty.
+    ctrl.editableThumbnailFilename = 'img_316_512.svg';
+    ctrl.subtopicTitle = 'Subtopic1';
+    ctrl.htmlData = '';
+    ctrl.editableUrlFragment = '';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when only editableThumbnailFilename and htmlData are
+    // valid but others are empty.
+    ctrl.editableThumbnailFilename = 'img_316_512.svg';
+    ctrl.subtopicTitle = '';
+    ctrl.htmlData = 'Subtopic description';
+    ctrl.editableUrlFragment = '';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when only editableThumbnailFilename and editableUrlFragment are
+    // valid but others are empty.
+    ctrl.editableThumbnailFilename = 'img_316_512.svg';
+    ctrl.subtopicTitle = '';
+    ctrl.htmlData = '';
+    ctrl.editableUrlFragment = 'subtopic-url';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when only subtopicTitle and htmlData are
+    // valid but others are empty.
+    ctrl.editableThumbnailFilename = '';
+    ctrl.subtopicTitle = 'Subtopic1';
+    ctrl.htmlData = 'Subtopic description';
+    ctrl.editableUrlFragment = '';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when only subtopicTitle and editableUrlFragment are
+    // valid but others are empty.
+    ctrl.editableThumbnailFilename = '';
+    ctrl.subtopicTitle = 'Subtopic1';
+    ctrl.htmlData = '';
+    ctrl.editableUrlFragment = 'subtopic-url';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails when only htmlData and editableUrlFragment are
+    // valid but others are empty.
+    ctrl.editableThumbnailFilename = '';
+    ctrl.subtopicTitle = '';
+    ctrl.htmlData = 'Subtopic description';
+    ctrl.editableUrlFragment = 'subtopic-url';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails validation if only subtopicTitle is valid.
+    ctrl.subtopicTitle = 'Subtopic1';
+    ctrl.htmlData = '';
+    ctrl.editableThumbnailFilename = '';
+    ctrl.editableUrlFragment = '';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails validation if only htmlData is valid.
+    ctrl.subtopicTitle = '';
+    ctrl.htmlData = 'Subtopic description';
+    ctrl.editableThumbnailFilename = '';
+    ctrl.editableUrlFragment = '';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails validation if only editableThumbnailFilename is valid.
+    ctrl.subtopicTitle = '';
+    ctrl.htmlData = '';
+    ctrl.editableThumbnailFilename = 'img_316_512.svg';
+    ctrl.editableUrlFragment = '';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Fails validation if only editableUrlFragment is valid.
+    ctrl.subtopicTitle = '';
+    ctrl.htmlData = '';
+    ctrl.editableThumbnailFilename = '';
+    ctrl.editableUrlFragment = 'subtopic-url';
+    expect(ctrl.isSubtopicValid()).toEqual(false);
+
+    // Passes validation when all fields are valid.
+    ctrl.subtopicTitle = 'Subtopic1';
+    ctrl.htmlData = 'Subtopic description';
+    ctrl.editableThumbnailFilename = 'img_316_512.svg';
+    ctrl.editableUrlFragment = 'subtopic-url';
     expect(ctrl.isSubtopicValid()).toEqual(true);
   });
 

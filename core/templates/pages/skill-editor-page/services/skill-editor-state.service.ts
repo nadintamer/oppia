@@ -61,7 +61,6 @@ angular.module('oppia').factory('SkillEditorStateService', [
 
     var _updateGroupedSkillSummaries = function(groupedSkillSummaries) {
       var topicName = null;
-      var sortedSkillSummaries = [];
       _groupedSkillSummaries.current = [];
       _groupedSkillSummaries.others = [];
 
@@ -96,9 +95,8 @@ angular.module('oppia').factory('SkillEditorStateService', [
       _skillRights.copyFromSkillRights(skillRights);
     };
 
-    var _updateSkillRights = function(newBackendSkillRightsObject) {
-      _setSkillRights(SkillRightsObjectFactory.createFromBackendDict(
-        newBackendSkillRightsObject));
+    var _updateSkillRights = function(newSkillRightsObject) {
+      _setSkillRights(newSkillRightsObject);
     };
     return {
       /**
@@ -125,8 +123,8 @@ angular.module('oppia').factory('SkillEditorStateService', [
             _skillIsBeingLoaded = false;
           });
         SkillRightsBackendApiService.fetchSkillRights(
-          skillId).then(function(newBackendSkillRightsObject) {
-          _updateSkillRights(newBackendSkillRightsObject);
+          skillId).then(function(newSkillRightsObject) {
+          _updateSkillRights(newSkillRightsObject);
           _skillIsBeingLoaded = false;
         }, function(error) {
           AlertsService.addWarning(

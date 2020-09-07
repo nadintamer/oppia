@@ -17,7 +17,7 @@
  */
 
 import { ComponentFixture, fakeAsync, TestBed} from '@angular/core/testing';
-import { EventEmitter, NO_ERRORS_SCHEMA, Pipe, PipeTransform }
+import { EventEmitter, NO_ERRORS_SCHEMA, Pipe }
   from '@angular/core';
 
 import { AboutPageComponent } from './about-page.component';
@@ -91,8 +91,6 @@ let component: AboutPageComponent;
 let fixture: ComponentFixture<AboutPageComponent>;
 
 describe('About Page', function() {
-  let i18n = null;
-  let translate = null;
   let windowRef: MockWindowRef;
 
   beforeEach(() => {
@@ -111,8 +109,6 @@ describe('About Page', function() {
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
-    translate = TestBed.get(TranslateService);
-    i18n = TestBed.get(I18nLanguageCodeService);
     fixture = TestBed.createComponent(AboutPageComponent);
     component = fixture.componentInstance;
   });

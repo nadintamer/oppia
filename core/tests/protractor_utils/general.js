@@ -20,6 +20,12 @@
 var ExplorationEditorPage = require(
   '../protractor_utils/ExplorationEditorPage.js');
 var waitFor = require('./waitFor.js');
+var dragAndDropScript = require('html-dnd').code;
+var action = require('../protractor_utils/action.js');
+
+var dragAndDrop = async function(fromElement, toElement) {
+  await browser.executeScript(dragAndDropScript, fromElement, toElement);
+};
 
 var scrollToTop = async function() {
   await browser.executeScript('window.scrollTo(0,0);');
@@ -138,9 +144,10 @@ var ensurePageHasNoTranslationIds = async function() {
   var REGEX_NG_VARIABLE = new RegExp('<\\[\'I18N_', 'g');
   var REGEX_NG_TOP_NAV_VISIBILITY = (
     new RegExp('ng-show="\\$ctrl.navElementsVisibilityStatus.I18N_', 'g'));
-  expect(promiseValue.replace(REGEX_TRANSLATE_ATTR, '')
-    .replace(REGEX_NG_VARIABLE, '')
-    .replace(REGEX_NG_TOP_NAV_VISIBILITY, '')).not.toContain('I18N');
+  expect(
+    promiseValue.replace(REGEX_TRANSLATE_ATTR, '')
+      .replace(REGEX_NG_VARIABLE, '')
+      .replace(REGEX_NG_TOP_NAV_VISIBILITY, '')).not.toContain('I18N');
 };
 
 var acceptAlert = async function() {
@@ -190,6 +197,24 @@ var goToHomePage = async function() {
   return await waitFor.pageToFullyLoad();
 };
 
+var openProfileDropdown = async function() {
+  var profileDropdown = element(
+    by.css('.protractor-test-profile-dropdown'));
+  await action.click(
+    'Profile dropdown taking too long to be clickable.',
+    profileDropdown);
+};
+
+var navigateToTopicsAndSkillsDashboardPage = async function() {
+  await openProfileDropdown();
+  var topicsAndSkillsDashboardLink = element(by.css(
+    '.protractor-test-topics-and-skills-dashboard-link'));
+  await action.click(
+    'Topics and skills dashboard link from dropdown',
+    topicsAndSkillsDashboardLink);
+  await waitFor.pageToFullyLoad();
+};
+
 exports.acceptAlert = acceptAlert;
 exports.scrollToTop = scrollToTop;
 exports.checkForConsoleErrors = checkForConsoleErrors;
@@ -211,9 +236,13 @@ exports.moveToPlayer = moveToPlayer;
 exports.moveToEditor = moveToEditor;
 exports.expect404Error = expect404Error;
 exports.closeCurrentTabAndSwitchTo = closeCurrentTabAndSwitchTo;
+exports.dragAndDrop = dragAndDrop;
 
 exports.ensurePageHasNoTranslationIds = ensurePageHasNoTranslationIds;
 
 exports.checkConsoleErrorsExist = checkConsoleErrorsExist;
 
 exports.goToHomePage = goToHomePage;
+exports.openProfileDropdown = openProfileDropdown;
+exports.navigateToTopicsAndSkillsDashboardPage = (
+  navigateToTopicsAndSkillsDashboardPage);

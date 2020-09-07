@@ -31,6 +31,7 @@ describe('Topic object factory', () => {
       id: 'sample_topic_id',
       name: 'Topic name',
       abbreviated_name: 'abbrev',
+      url_fragment: 'topic-one',
       thumbnail_filename: 'img.png',
       thumbnail_bg_color: '#a33f40',
       description: 'Topic description',
@@ -55,10 +56,13 @@ describe('Topic object factory', () => {
         title: 'Title',
         skill_ids: ['skill_3'],
         thumbnail_filename: 'img.png',
-        thumbnail_bg_color: '#a33f40'
+        thumbnail_bg_color: '#a33f40',
+        url_fragment: 'title'
       }],
       next_subtopic_id: 1,
-      language_code: 'en'
+      language_code: 'en',
+      meta_tag_content: 'topic meta tag content',
+      practice_tab_is_displayed: false
     };
     let skillIdToDescriptionDict = {
       skill_1: 'Description 1',
@@ -119,6 +123,7 @@ describe('Topic object factory', () => {
       id: 'topic_id_2',
       name: 'Another name',
       abbreviated_name: 'abbrev',
+      url_fragment: 'topic-two',
       thumbnail_filename: 'img.png',
       thumbnail_bg_color: '#a33f40',
       description: 'Another description',
@@ -139,8 +144,11 @@ describe('Topic object factory', () => {
         title: 'Title',
         skill_ids: ['skill_1'],
         thumbnail_filename: 'img.png',
-        thumbnail_bg_color: '#a33f40'
-      }]
+        thumbnail_bg_color: '#a33f40',
+        url_fragment: 'title'
+      }],
+      practice_tab_is_displayed: false,
+      meta_tag_content: 'second topic meta tag content'
     }, {
       skill_1: 'Description 1',
       skill_2: 'Description 2',

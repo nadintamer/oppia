@@ -17,6 +17,8 @@
  */
 
 require('third-party-imports/ckeditor.import.ts');
+
+require('components/ck-editor-helpers/ck-editor-copy-content-service.ts');
 require('services/context.service.ts');
 require('services/rte-helper.service.ts');
 
@@ -31,8 +33,8 @@ interface CkeditorCustomScope extends ng.IScope {
 }
 
 angular.module('oppia').directive('ckEditor4Rte', [
-  'ContextService', 'RteHelperService', 'ENABLE_SVG_EDITOR_RTE',
-  function(ContextService, RteHelperService, ENABLE_SVG_EDITOR_RTE) {
+  'CkEditorCopyContentService', 'ContextService', 'RteHelperService',
+  function(CkEditorCopyContentService, ContextService, RteHelperService) {
     return {
       restrict: 'E',
       scope: {
@@ -51,13 +53,6 @@ angular.module('oppia').directive('ckEditor4Rte', [
         var canReferToSkills = ContextService.canEntityReferToSkills();
 
         _RICH_TEXT_COMPONENTS.forEach(function(componentDefn) {
-          // TODO(#9358): Remove the if condition once the svgdiagram is
-          // available for the users.
-          if (componentDefn.id === 'svgdiagram') {
-            if (!ENABLE_SVG_EDITOR_RTE) {
-              return;
-            }
-          }
           if (!((scope.uiConfig() &&
             scope.uiConfig().hide_complex_extensions &&
             componentDefn.isComplex) ||
@@ -106,7 +101,6 @@ angular.module('oppia').directive('ckEditor4Rte', [
                                        inlineWrapperRule +
                                        blockWrapperRule +
                                        blockOverlayRule;
-
         var pluginNames = names.map(function(name) {
           return 'oppia' + name;
         }).join(',');
@@ -118,9 +112,6 @@ angular.module('oppia').directive('ckEditor4Rte', [
           });
         }
         buttonNames.pop();
-        // All icons on the toolbar except the Rich Text components.
-        var allIcons = ['undo', 'redo', 'bold', 'Italic', 'numberedList',
-          'bulletedList', 'pre', 'indent', 'outdent'];
 
         // Add external plugins.
         CKEDITOR.plugins.addExternal(
@@ -210,7 +201,6 @@ angular.module('oppia').directive('ckEditor4Rte', [
           // Set the css and icons for each toolbar button.
           names.forEach(function(name, index) {
             var icon = icons[index];
-            var upperCasedName = name.charAt(0).toUpperCase() + name.slice(1);
             $('.cke_button__oppia' + name)
               .css('background-image', 'url("/extensions' + icon + '")')
               .css('background-position', 'center')
@@ -276,6 +266,8 @@ angular.module('oppia').directive('ckEditor4Rte', [
           // Clean up CKEditor instance when directive is removed.
           ck.destroy();
         });
+
+        CkEditorCopyContentService.bindPasteHandler(ck);
       }
     };
   }

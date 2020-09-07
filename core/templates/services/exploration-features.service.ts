@@ -19,20 +19,19 @@
 
 import { downgradeInjectable } from '@angular/upgrade/static';
 import { Injectable } from '@angular/core';
+import { ExplorationFeatures } from
+  'services/exploration-features-backend-api.service';
 
-export interface IExplorationDataDict {
-  paramChanges: IParamChanges[] | [];
+export interface ExplorationDataDict {
+  'param_changes': ParamChanges[] | [];
   states: {
     [propsName : string]: {
-      paramChanges: IParamChanges[] | []
+      'param_changes': ParamChanges[] | []
     }
   };
 }
-export interface IFeatureDataDict {
-  'is_exploration_whitelisted': boolean;
-  'is_improvements_tab_enabled': boolean;
-}
-export interface IParamChanges {
+
+export interface ParamChanges {
   name: string;
   'generator_id': string;
   'customization_args': {
@@ -48,22 +47,19 @@ export class ExplorationFeaturesService {
   static serviceIsInitialized = false;
   static settings = {
     areParametersEnabled: false,
-    isImprovementsTabEnabled: false,
     isPlaythroughRecordingEnabled: false
   };
 
   init(
-      explorationData: IExplorationDataDict,
-      featuresData: IFeatureDataDict): void {
+      explorationData: ExplorationDataDict,
+      featuresData: ExplorationFeatures): void {
     if (ExplorationFeaturesService.serviceIsInitialized) {
       return;
     }
-    ExplorationFeaturesService.settings.isImprovementsTabEnabled =
-      featuresData.is_improvements_tab_enabled;
     ExplorationFeaturesService.settings.isPlaythroughRecordingEnabled =
-      featuresData.is_exploration_whitelisted;
-    if (explorationData.paramChanges &&
-        explorationData.paramChanges.length > 0) {
+      featuresData.isExplorationWhitelisted;
+    if (explorationData.param_changes &&
+        explorationData.param_changes.length > 0) {
       this.enableParameters();
     } else {
       for (var state in explorationData.states.states) {
@@ -82,10 +78,6 @@ export class ExplorationFeaturesService {
 
   areParametersEnabled(): boolean {
     return ExplorationFeaturesService.settings.areParametersEnabled;
-  }
-
-  isImprovementsTabEnabled(): boolean {
-    return ExplorationFeaturesService.settings.isImprovementsTabEnabled;
   }
 
   isPlaythroughRecordingEnabled(): boolean {

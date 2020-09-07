@@ -85,12 +85,22 @@ class SentEmailModel(base_models.BaseModel):
         """Sent email should be kept for audit purposes."""
         return base_models.DELETION_POLICY.KEEP
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Users already have access to this data since emails were sent
         to them.
         """
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'recipient_id': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'recipient_email': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'sender_id': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'sender_email': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'intent': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'subject': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'html_body': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'sent_datetime': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'email_hash': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
 
     @classmethod
     def has_reference_to_user_id(cls, user_id):
@@ -119,7 +129,7 @@ class SentEmailModel(base_models.BaseModel):
             str. The newly-generated ID for the SentEmailModel instance.
 
         Raises:
-            Exception: The id generator for SentEmailModel is producing
+            Exception. The id generator for SentEmailModel is producing
                 too many collisions.
         """
         id_prefix = '%s.' % intent
@@ -190,7 +200,7 @@ class SentEmailModel(base_models.BaseModel):
             value and sent more recently than sent_datetime_lower_bound.
 
         Raises:
-            Exception: sent_datetime_lower_bound is not a valid
+            Exception. The sent_datetime_lower_bound is not a valid
                 datetime.datetime.
         """
 
@@ -302,12 +312,20 @@ class BulkEmailModel(base_models.BaseModel):
         """Sent email should be kept for audit purposes."""
         return base_models.DELETION_POLICY.KEEP
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Users already have access to this data since the emails were sent
         to them.
         """
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'recipient_ids': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'sender_id': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'sender_email': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'intent': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'subject': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'html_body': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'sent_datetime': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
 
     @classmethod
     def has_reference_to_user_id(cls, user_id):
@@ -371,10 +389,14 @@ class GeneralFeedbackEmailReplyToIdModel(base_models.BaseModel):
         """Feedback email reply to id should be deleted."""
         return base_models.DELETION_POLICY.DELETE
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Model contains user data."""
-        return base_models.EXPORT_POLICY.CONTAINS_USER_DATA
+        return dict(super(cls, cls).get_export_policy(), **{
+            'user_id': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'thread_id': base_models.EXPORT_POLICY.EXPORTED,
+            'reply_to_id': base_models.EXPORT_POLICY.EXPORTED
+        })
 
     @classmethod
     def has_reference_to_user_id(cls, user_id):
@@ -434,14 +456,14 @@ class GeneralFeedbackEmailReplyToIdModel(base_models.BaseModel):
             with the unique reply_to_id generated.
 
         Raises:
-            Exception: Model instance for given user_id and
+            Exception. Model instance for given user_id and
                 thread_id already exists.
         """
 
         instance_id = cls._generate_id(user_id, thread_id)
         if cls.get_by_id(instance_id):
-            raise Exception('Unique reply-to ID for given user and thread'
-                            ' already exists.')
+            raise Exception(
+                'Unique reply-to ID for given user and thread already exists.')
 
         reply_to_id = cls._generate_unique_reply_to_id()
         feedback_email_reply_model_instance = cls(

@@ -66,7 +66,7 @@ describe('Learner answer info service', function() {
         }
       },
       interaction: {
-        id: 'RuleTest',
+        id: null,
         answer_groups: [{
           outcome: {
             dest: 'outcome 1',
@@ -80,11 +80,9 @@ describe('Learner answer info service', function() {
             missing_prerequisite_skill_id: null
           },
           rule_specs: [{
-            inputs: {
-              x: 10
-            },
-            rule_type: 'Equals'
-          }]
+            rule_type: 'Equals',
+            inputs: {x: 10}
+          }],
         }, {
           outcome: {
             dest: 'outcome 2',
@@ -98,21 +96,15 @@ describe('Learner answer info service', function() {
             missing_prerequisite_skill_id: null
           },
           rule_specs: [{
-            inputs: {
-              x: 5
-            },
-            rule_type: 'Equals'
+            rule_type: 'Equals',
+            inputs: { x: 5 }
           }, {
-            inputs: {
-              x: 7
-            },
-            rule_type: 'NotEquals'
+            rule_type: 'Equals',
+            inputs: { x: 6 }
           }, {
-            inputs: {
-              x: 6
-            },
-            rule_type: 'Equals'
-          }]
+            rule_type: 'NotEquals',
+            inputs: { x: 7 }
+          }],
         }],
         default_outcome: {
           dest: 'default',
@@ -153,7 +145,7 @@ describe('Learner answer info service', function() {
     thirdState = sof.createFromBackendDict('demo state', stateDict);
     spyOn(AnswerClassificationService, 'getMatchingClassificationResult')
       .and.returnValue(acrof.createNew(
-        oof.createNew('default', 'default_outcome', '', []), 2, 0,
+        oof.createNew('default', 'default_outcome', '', []), 2,
         DEFAULT_OUTCOME_CLASSIFICATION));
     mockAnswer = 'This is my answer';
     mockInteractionRulesService = {
@@ -254,7 +246,7 @@ describe('Learner answer info service', function() {
       LearnerAnswerInfoService.recordLearnerAnswerInfo('My details');
       expect(
         ladbas.recordLearnerAnswerDetails).toHaveBeenCalledWith(
-        '10', 'new state', 'RuleTest', 'This is my answer', 'My details');
+        '10', 'new state', null, 'This is my answer', 'My details');
     });
   });
 

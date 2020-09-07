@@ -17,7 +17,6 @@
 from __future__ import absolute_import  # pylint: disable=import-only-modules
 from __future__ import unicode_literals  # pylint: disable=import-only-modules
 
-from constants import constants
 from core.controllers import acl_decorators
 from core.controllers import base
 from core.domain import subtopic_page_services
@@ -31,9 +30,6 @@ class SubtopicViewerPage(base.BaseHandler):
     @acl_decorators.can_access_subtopic_viewer_page
     def get(self, *args):
         """Handles GET requests."""
-
-        if not constants.ENABLE_NEW_STRUCTURE_PLAYERS:
-            raise self.PageNotFoundException
 
         self.render_template('subtopic-viewer-page.mainpage.html')
 
@@ -55,8 +51,6 @@ class SubtopicPageDataHandler(base.BaseHandler):
             subtopic_id: str. The id of the subtopic, which is an integer in
                 string form.
         """
-        if not constants.ENABLE_NEW_STRUCTURE_PLAYERS:
-            raise self.PageNotFoundException
 
         subtopic_id = int(subtopic_id)
         topic = topic_fetchers.get_topic_by_name(topic_name)
@@ -66,6 +60,11 @@ class SubtopicPageDataHandler(base.BaseHandler):
                 subtopic_title = subtopic.title
                 if index != len(topic.subtopics) - 1:
                     next_subtopic_dict = topic.subtopics[index + 1].to_dict()
+                # Checking greater than 1 here, since otherwise the only
+                # subtopic page of the topic would always link to itself at the
+                # bottom of the subtopic page which isn't expected.
+                elif len(topic.subtopics) > 1:
+                    next_subtopic_dict = topic.subtopics[0].to_dict()
                 break
         subtopic_page_contents = (
             subtopic_page_services.get_subtopic_page_contents_by_id(
@@ -74,6 +73,7 @@ class SubtopicPageDataHandler(base.BaseHandler):
 
         self.values.update({
             'topic_id': topic.id,
+            'topic_name': topic.name,
             'page_contents': subtopic_page_contents_dict,
             'subtopic_title': subtopic_title,
             'next_subtopic_dict': next_subtopic_dict

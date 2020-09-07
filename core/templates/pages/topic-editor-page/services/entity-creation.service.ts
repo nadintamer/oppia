@@ -29,11 +29,13 @@ require(
 require('components/entity-creation-services/skill-creation.service.ts');
 require('domain/skill/RubricObjectFactory.ts');
 require('components/rubrics-editor/rubrics-editor.directive.ts');
-require('pages/topics-and-skills-dashboard-page/' +
-    'create-new-skill-modal.controller.ts');
+require(
+  'pages/topics-and-skills-dashboard-page/' +
+  'create-new-skill-modal.controller.ts');
 require('pages/topic-editor-page/services/topic-editor-routing.service.ts');
 require('pages/topic-editor-page/services/topic-editor-state.service.ts');
-require('pages/topic-editor-page/modal-templates/' +
+require(
+  'pages/topic-editor-page/modal-templates/' +
   'create-new-subtopic-modal.controller.ts');
 require('services/context.service.ts');
 require('services/image-local-storage.service.ts');
@@ -51,14 +53,19 @@ angular.module('oppia').factory('EntityCreationService', [
         templateUrl: UrlInterpolationService.getDirectiveTemplateUrl(
           '/pages/topic-editor-page/modal-templates/' +
           'create-new-subtopic-modal.template.html'),
-        backdrop: true,
+        backdrop: 'static',
         resolve: {
           topic: () => topic
         },
         controllerAs: '$ctrl',
+        windowClass: 'create-new-subtopic',
         controller: 'CreateNewSubtopicModalController'
       }).result.then(function(subtopicId) {
         TopicEditorRoutingService.navigateToSubtopicEditorWithId(subtopicId);
+      }, function() {
+        // Note to developers:
+        // This callback is triggered when the Cancel button is clicked.
+        // No further action is needed.
       });
     };
 

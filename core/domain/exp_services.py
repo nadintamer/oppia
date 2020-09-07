@@ -36,6 +36,7 @@ import zipfile
 
 from constants import constants
 from core.domain import activity_services
+from core.domain import caching_services
 from core.domain import classifier_services
 from core.domain import draft_upgrade_services
 from core.domain import email_subscription_services
@@ -46,6 +47,8 @@ from core.domain import html_cleaner
 from core.domain import html_validation_service
 from core.domain import opportunity_services
 from core.domain import param_domain
+from core.domain import recommendations_services
+from core.domain import rights_domain
 from core.domain import rights_manager
 from core.domain import search_services
 from core.domain import state_domain
@@ -57,7 +60,6 @@ import python_utils
 import utils
 
 datastore_services = models.Registry.import_datastore_services()
-memcache_services = models.Registry.import_memcache_services()
 taskqueue_services = models.Registry.import_taskqueue_services()
 (exp_models, feedback_models, user_models) = models.Registry.import_models([
     models.NAMES.exploration, models.NAMES.feedback, models.NAMES.user
@@ -341,7 +343,7 @@ def apply_change_list(exploration_id, change_list):
         the given changelist to the existing version of the exploration.
 
     Raises:
-        Exception: Any entries in the changelist are invalid.
+        Exception. Any entries in the changelist are invalid.
     """
     exploration = exp_fetchers.get_exploration_by_id(exploration_id)
     try:
@@ -362,68 +364,64 @@ def apply_change_list(exploration_id, change_list):
                         list(python_utils.MAP(
                             to_param_domain, change.new_value)))
                 elif change.property_name == exp_domain.STATE_PROPERTY_CONTENT:
-                    state.update_content(
+                    content = (
                         state_domain.SubtitledHtml.from_dict(change.new_value))
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_INTERACTION_ID):
+                    content.validate()
+                    state.update_content(content)
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_INTERACTION_ID):
                     state.update_interaction_id(change.new_value)
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_INTERACTION_CUST_ARGS):
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_NEXT_CONTENT_ID_INDEX):
+                    state.update_next_content_id_index(change.new_value)
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_INTERACTION_CUST_ARGS):
                     state.update_interaction_customization_args(
                         change.new_value)
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_INTERACTION_HANDLERS):
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_INTERACTION_HANDLERS):
                     raise utils.InvalidInputException(
                         'Editing interaction handlers is no longer supported')
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_INTERACTION_ANSWER_GROUPS):
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_INTERACTION_ANSWER_GROUPS):
                     state.update_interaction_answer_groups(change.new_value)
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_INTERACTION_DEFAULT_OUTCOME):
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_INTERACTION_DEFAULT_OUTCOME):
                     new_outcome = None
                     if change.new_value:
                         new_outcome = state_domain.Outcome.from_dict(
                             change.new_value
                         )
                     state.update_interaction_default_outcome(new_outcome)
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_UNCLASSIFIED_ANSWERS):
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_UNCLASSIFIED_ANSWERS):
                     state.update_interaction_confirmed_unclassified_answers(
                         change.new_value)
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_INTERACTION_HINTS):
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_INTERACTION_HINTS):
                     if not isinstance(change.new_value, list):
-                        raise Exception('Expected hints_list to be a list,'
-                                        ' received %s' % change.new_value)
+                        raise Exception(
+                            'Expected hints_list to be a list,'
+                            ' received %s' % change.new_value)
                     new_hints_list = [state_domain.Hint.from_dict(hint_dict)
                                       for hint_dict in change.new_value]
                     state.update_interaction_hints(new_hints_list)
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_INTERACTION_SOLUTION):
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_INTERACTION_SOLUTION):
                     new_solution = None
                     if change.new_value is not None:
                         new_solution = state_domain.Solution.from_dict(
                             state.interaction.id, change.new_value)
                     state.update_interaction_solution(new_solution)
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_SOLICIT_ANSWER_DETAILS):
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_SOLICIT_ANSWER_DETAILS):
                     if not isinstance(change.new_value, bool):
                         raise Exception(
                             'Expected solicit_answer_details to be a ' +
                             'bool, received %s' % change.new_value)
                     state.update_solicit_answer_details(change.new_value)
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_RECORDED_VOICEOVERS):
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_RECORDED_VOICEOVERS):
                     if not isinstance(change.new_value, dict):
                         raise Exception(
                             'Expected recorded_voiceovers to be a dict, '
@@ -448,9 +446,8 @@ def apply_change_list(exploration_id, change_list):
                         state_domain.RecordedVoiceovers.from_dict(
                             change.new_value))
                     state.update_recorded_voiceovers(recorded_voiceovers)
-                elif (
-                        change.property_name ==
-                        exp_domain.STATE_PROPERTY_WRITTEN_TRANSLATIONS):
+                elif (change.property_name ==
+                      exp_domain.STATE_PROPERTY_WRITTEN_TRANSLATIONS):
                     if not isinstance(change.new_value, dict):
                         raise Exception(
                             'Expected written_translations to be a dict, '
@@ -536,11 +533,11 @@ def _save_exploration(committer_id, exploration, commit_message, change_list):
             this commit.
 
     Raises:
-        Exception: The versions of the given exploration and the currently
+        Exception. The versions of the given exploration and the currently
             stored exploration model do not match.
     """
     exploration_rights = rights_manager.get_exploration_rights(exploration.id)
-    if exploration_rights.status != rights_manager.ACTIVITY_STATUS_PRIVATE:
+    if exploration_rights.status != rights_domain.ACTIVITY_STATUS_PRIVATE:
         exploration.validate(strict=True)
     else:
         exploration.validate()
@@ -581,8 +578,10 @@ def _save_exploration(committer_id, exploration, commit_message, change_list):
 
     change_list_dict = [change.to_dict() for change in change_list]
     exploration_model.commit(committer_id, commit_message, change_list_dict)
-    exp_memcache_key = exp_fetchers.get_exploration_memcache_key(exploration.id)
-    memcache_services.delete(exp_memcache_key)
+    caching_services.delete_multi(
+        caching_services.CACHE_NAMESPACE_EXPLORATION,
+        None,
+        [exploration.id])
 
     exploration.version += 1
 
@@ -591,7 +590,7 @@ def _save_exploration(committer_id, exploration, commit_message, change_list):
     # Trigger statistics model update.
     new_exp_stats = stats_services.get_stats_for_new_exp_version(
         exploration.id, exploration.version, exploration.states,
-        exp_versions_diff=exp_versions_diff, revert_to_version=None)
+        exp_versions_diff, None)
 
     stats_services.create_stats_model(new_exp_stats)
 
@@ -616,8 +615,7 @@ def _save_exploration(committer_id, exploration, commit_message, change_list):
 
     # Trigger exploration issues model updation.
     stats_services.update_exp_issues_for_new_exp_version(
-        exploration, exp_versions_diff=exp_versions_diff,
-        revert_to_version=None)
+        exploration, exp_versions_diff, None)
 
 
 def _create_exploration(
@@ -757,19 +755,19 @@ def delete_explorations(committer_id, exploration_ids, force_deletion=False):
         feconf.COMMIT_MESSAGE_EXPLORATION_DELETED,
         force_deletion=force_deletion)
 
-    # This must come after the explorations are retrieved. Otherwise the
-    # memcache keys will be reinstated.
-    exploration_memcache_keys = [
-        exp_fetchers.get_exploration_memcache_key(exploration_id)
-        for exploration_id in exploration_ids]
-    memcache_services.delete_multi(exploration_memcache_keys)
+    caching_services.delete_multi(
+        caching_services.CACHE_NAMESPACE_EXPLORATION, None,
+        exploration_ids)
 
     # Delete the explorations from search.
     search_services.delete_explorations_from_search_index(exploration_ids)
 
-    # Delete the exploration summaries, regardless of whether or not
-    # force_deletion is True.
+    # Delete the exploration summaries, recommendations and opportunities
+    # regardless of whether or not force_deletion is True.
     delete_exploration_summaries(exploration_ids)
+    recommendations_services.delete_explorations_from_recommendations(
+        exploration_ids)
+    opportunity_services.delete_exploration_opportunities(exploration_ids)
 
     # Remove the explorations from the featured activity references, if
     # necessary.
@@ -898,10 +896,10 @@ def update_exploration(
             voice artist.
 
     Raises:
-        ValueError: No commit message is supplied and the exploration is public.
-        ValueError: The update is due to a suggestion and the commit message is
+        ValueError. No commit message is supplied and the exploration is public.
+        ValueError. The update is due to a suggestion and the commit message is
             invalid.
-        ValueError: The update is not due to a suggestion, and the commit
+        ValueError. The update is not due to a suggestion, and the commit
             message starts with the same prefix as the commit message for
             accepted suggestions.
     """
@@ -1137,7 +1135,11 @@ def delete_exploration_summaries(exploration_ids):
             deleted.
     """
     summary_models = exp_models.ExpSummaryModel.get_multi(exploration_ids)
-    exp_models.ExpSummaryModel.delete_multi(summary_models)
+    existing_summary_models = [
+        summary_model for summary_model in summary_models
+        if summary_model is not None
+    ]
+    exp_models.ExpSummaryModel.delete_multi(existing_summary_models)
 
 
 def revert_exploration(
@@ -1153,8 +1155,8 @@ def revert_exploration(
             is to be reverted.
 
     Raises:
-        Exception:  does not match the version of the currently-stored
-            exploration model.
+        Exception. Version of exploration does not match the version of the
+            currently-stored exploration model.
     """
     exploration_model = exp_models.ExplorationModel.get(
         exploration_id, strict=False)
@@ -1175,7 +1177,7 @@ def revert_exploration(
     exploration = exp_fetchers.get_exploration_by_id(
         exploration_id, version=revert_to_version)
     exploration_rights = rights_manager.get_exploration_rights(exploration.id)
-    if exploration_rights.status != rights_manager.ACTIVITY_STATUS_PRIVATE:
+    if exploration_rights.status != rights_domain.ACTIVITY_STATUS_PRIVATE:
         exploration.validate(strict=True)
     else:
         exploration.validate()
@@ -1184,8 +1186,9 @@ def revert_exploration(
         exploration_model, committer_id,
         'Reverted exploration to version %s' % revert_to_version,
         revert_to_version)
-    exp_memcache_key = exp_fetchers.get_exploration_memcache_key(exploration.id)
-    memcache_services.delete(exp_memcache_key)
+    caching_services.delete_multi(
+        caching_services.CACHE_NAMESPACE_EXPLORATION, None,
+        [exploration.id])
 
     # Update the exploration summary, but since this is just a revert do
     # not add the committer of the revert to the list of contributors.
@@ -1193,14 +1196,13 @@ def revert_exploration(
 
     exploration_stats = stats_services.get_stats_for_new_exp_version(
         exploration.id, current_version + 1, exploration.states,
-        exp_versions_diff=None, revert_to_version=revert_to_version)
+        None, revert_to_version)
     stats_services.create_stats_model(exploration_stats)
 
     current_exploration = exp_fetchers.get_exploration_by_id(
         exploration_id, version=current_version)
     stats_services.update_exp_issues_for_new_exp_version(
-        current_exploration, exp_versions_diff=None,
-        revert_to_version=revert_to_version)
+        current_exploration, None, revert_to_version)
 
     if feconf.ENABLE_ML_CLASSIFIERS:
         exploration_to_revert_to = exp_fetchers.get_exploration_by_id(
@@ -1224,7 +1226,7 @@ def get_demo_exploration_components(demo_path):
         filepath does not include the assets/ prefix.
 
     Raises:
-        Exception: The path of the file is unrecognized or does not exist.
+        Exception. The path of the file is unrecognized or does not exist.
     """
     demo_filepath = os.path.join(feconf.SAMPLE_EXPLORATIONS_DIR, demo_path)
 
@@ -1256,7 +1258,7 @@ def save_new_exploration_from_yaml_and_assets(
             from the imported exploration.
 
     Raises:
-        Exception: The yaml file is invalid due to a missing schema version.
+        Exception. The yaml file is invalid due to a missing schema version.
     """
     if assets_list is None:
         assets_list = []
@@ -1312,7 +1314,7 @@ def delete_demo(exploration_id):
         exploration_id: str. The id of the exploration to be deleted.
 
     Raises:
-        Exception: The exploration id is invalid.
+        Exception. The exploration id is invalid.
     """
     if not exp_domain.Exploration.is_demo_exploration_id(exploration_id):
         raise Exception('Invalid demo exploration id %s' % exploration_id)
@@ -1320,8 +1322,9 @@ def delete_demo(exploration_id):
     exploration = exp_fetchers.get_exploration_by_id(
         exploration_id, strict=False)
     if not exploration:
-        logging.info('Exploration with id %s was not deleted, because it '
-                     'does not exist.' % exploration_id)
+        logging.info(
+            'Exploration with id %s was not deleted, because it '
+            'does not exist.' % exploration_id)
     else:
         delete_exploration(
             feconf.SYSTEM_COMMITTER_ID, exploration_id, force_deletion=True)
@@ -1337,7 +1340,7 @@ def load_demo(exploration_id):
         exploration_id: str. The id of the demo exploration.
 
     Raises:
-        Exception: The exploration id provided is invalid.
+        Exception. The exploration id provided is invalid.
     """
     if not exp_domain.Exploration.is_demo_exploration_id(exploration_id):
         raise Exception('Invalid demo exploration id %s' % exploration_id)
@@ -1388,7 +1391,7 @@ def get_next_page_of_all_non_private_commits(
               are probably more results.
 
     Raises:
-        ValueError: The argument max_age is not datetime.timedelta or None.
+        ValueError. The argument max_age is not datetime.timedelta or None.
     """
     if max_age is not None and not isinstance(max_age, datetime.timedelta):
         raise ValueError(
@@ -1410,7 +1413,7 @@ def get_image_filenames_from_exploration(exploration):
     """Get the image filenames from the exploration.
 
     Args:
-        exploration: Exploration object. The exploration itself.
+        exploration: Exploration. The exploration to get the image filenames.
 
     Returns:
         list(str). List containing the name of the image files in exploration.
@@ -1419,7 +1422,7 @@ def get_image_filenames_from_exploration(exploration):
     for state in exploration.states.values():
         if state.interaction.id == 'ImageClickInput':
             filenames.append(state.interaction.customization_args[
-                'imageAndRegions']['value']['imagePath'])
+                'imageAndRegions'].value['imagePath'])
 
     html_list = exploration.get_all_html_content_strings()
     filenames.extend(
@@ -1569,10 +1572,11 @@ def get_user_exploration_data(
     for state_name in exploration.states:
         state_dict = exploration.states[state_name].to_dict()
         states[state_name] = state_dict
-    draft_changes = (exp_user_data.draft_change_list if exp_user_data
-                     and exp_user_data.draft_change_list else None)
-    draft_change_list_id = (exp_user_data.draft_change_list_id
-                            if exp_user_data else 0)
+    draft_changes = (
+        exp_user_data.draft_change_list if exp_user_data
+        and exp_user_data.draft_change_list else None)
+    draft_change_list_id = (
+        exp_user_data.draft_change_list_id if exp_user_data else 0)
     exploration_email_preferences = (
         user_services.get_email_preferences_for_exploration(
             user_id, exploration_id))
@@ -1684,8 +1688,7 @@ def get_exp_with_draft_applied(exp_id, user_id):
             draft_change_list = [
                 exp_domain.ExplorationChange(change)
                 for change in exp_user_data.draft_change_list]
-            if (
-                    exploration.version >
+            if (exploration.version >
                     exp_user_data.draft_change_list_exp_version):
                 logging.info(
                     'Exploration and draft versions out of sync, trying '
@@ -1694,7 +1697,7 @@ def get_exp_with_draft_applied(exp_id, user_id):
                     draft_upgrade_services.try_upgrading_draft_to_exp_version(
                         draft_change_list,
                         exp_user_data.draft_change_list_exp_version,
-                        exploration.version, exp_id))
+                        exploration.version, exploration.id))
                 if new_draft_change_list is not None:
                     draft_change_list = new_draft_change_list
                     draft_change_list_exp_version = exploration.version
@@ -1749,7 +1752,7 @@ def get_interaction_id_for_state(exp_id, state_name):
         str. The ID of the interaction.
 
     Raises:
-        Exception: If the state with the given state name does not exist in
+        Exception. If the state with the given state name does not exist in
             the exploration.
     """
     exploration = exp_fetchers.get_exploration_by_id(exp_id)

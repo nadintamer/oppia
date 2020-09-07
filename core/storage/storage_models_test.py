@@ -22,6 +22,7 @@ import inspect
 from core.domain import takeout_service
 from core.platform import models
 from core.tests import test_utils
+import python_utils
 
 (
     base_models, collection_models, email_models,
@@ -112,7 +113,11 @@ class StorageModelsTest(test_utils.GenericTestBase):
     def test_base_models_do_not_have_get_deletion_policy(self):
         for clazz in self._get_model_classes():
             if clazz.__name__ in self.BASE_CLASSES:
-                with self.assertRaises(NotImplementedError):
+                with self.assertRaisesRegexp(
+                    NotImplementedError,
+                    r'The get_deletion_policy\(\) method is missing from the '
+                    r'derived class. It should be implemented in the '
+                    r'derived class.'):
                     clazz.get_deletion_policy()
 
     def test_base_or_versioned_child_classes_have_has_reference_to_user_id(
@@ -120,7 +125,11 @@ class StorageModelsTest(test_utils.GenericTestBase):
         for clazz in self._get_base_or_versioned_model_child_classes():
             if (clazz.get_deletion_policy() ==
                     base_models.DELETION_POLICY.NOT_APPLICABLE):
-                with self.assertRaises(NotImplementedError):
+                with self.assertRaisesRegexp(
+                    NotImplementedError,
+                    r'The has_reference_to_user_id\(\) method is missing from '
+                    r'the derived class. It should be implemented in the '
+                    r'derived class.'):
                     clazz.has_reference_to_user_id('any_id')
             else:
                 try:
@@ -141,17 +150,37 @@ class StorageModelsTest(test_utils.GenericTestBase):
             for clazz in self._get_model_classes()
             if not clazz.__name__ in self.BASE_CLASSES
         ]
-        models_with_export = (takeout_service
-                              .get_models_which_should_be_exported())
+        models_with_export = (
+            takeout_service.get_models_which_should_be_exported())
         for model in all_models:
             export_policy = model.get_export_policy()
             if model in models_with_export:
-                self.assertEqual(
-                    base_models.EXPORT_POLICY.CONTAINS_USER_DATA,
-                    export_policy
+                self.assertTrue(
+                    base_models.EXPORT_POLICY.EXPORTED in export_policy.values()
                 )
             else:
-                self.assertEqual(
-                    base_models.EXPORT_POLICY.NOT_APPLICABLE,
-                    export_policy
-                )
+                self.assertNotIn(
+                    base_models.EXPORT_POLICY.EXPORTED, export_policy.values())
+
+    def test_all_fields_have_export_policy(self):
+        """Ensure every field in every model has an export policy defined."""
+        all_models = [
+            clazz
+            for clazz in self._get_model_classes()
+            if not clazz.__name__ in self.BASE_CLASSES
+        ]
+        for model in all_models:
+            export_policy = model.get_export_policy()
+            self.assertEqual(
+                sorted([
+                    python_utils.UNICODE(prop) for prop
+                    in model._properties]), # pylint: disable=protected-access
+                sorted(export_policy.keys())
+            )
+            self.assertTrue(
+                set(export_policy.values()).issubset(
+                    {
+                        base_models.EXPORT_POLICY.EXPORTED,
+                        base_models.EXPORT_POLICY.NOT_APPLICABLE
+                    })
+            )

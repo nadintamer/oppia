@@ -45,15 +45,15 @@ angular.module('oppia').component('preferencesPage', {
   },
   template: require('./preferences-page.component.html'),
   controller: [
-    '$http', '$q', '$translate', '$timeout', '$window',
-    '$uibModal', 'AlertsService', 'I18nLanguageCodeService',
+    '$http', '$q', '$timeout', '$translate', '$uibModal', '$window',
+    'AlertsService', 'I18nLanguageCodeService',
     'LanguageUtilService', 'LoaderService', 'UrlInterpolationService',
     'UserService', 'DASHBOARD_TYPE_CREATOR', 'DASHBOARD_TYPE_LEARNER',
     'ENABLE_ACCOUNT_DELETION', 'ENABLE_ACCOUNT_EXPORT',
     'SUPPORTED_AUDIO_LANGUAGES', 'SUPPORTED_SITE_LANGUAGES',
     function(
-        $http, $q, $translate, $timeout, $window,
-        $uibModal, AlertsService, I18nLanguageCodeService,
+        $http, $q, $timeout, $translate, $uibModal, $window,
+        AlertsService, I18nLanguageCodeService,
         LanguageUtilService, LoaderService, UrlInterpolationService,
         UserService, DASHBOARD_TYPE_CREATOR, DASHBOARD_TYPE_LEARNER,
         ENABLE_ACCOUNT_DELETION, ENABLE_ACCOUNT_EXPORT,
@@ -68,7 +68,7 @@ angular.module('oppia').component('preferencesPage', {
         $http.put(_PREFERENCES_DATA_URL, {
           update_type: updateType,
           data: data
-        });
+        }).then(() => AlertsService.addInfoMessage('Saved!', 1000));
       };
 
       // Select2 dropdown cannot automatically refresh its display

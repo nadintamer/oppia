@@ -15,7 +15,7 @@
 /**
  * @fileoverview Component for the explaration player page.
  */
-
+require('components/on-screen-keyboard/on-screen-keyboard.component.ts');
 require('base-components/base-content.directive.ts');
 require(
   'components/common-layout-directives/common-elements/' +
@@ -31,6 +31,8 @@ require(
 
 require('interactions/interactionsRequires.ts');
 require('objects/objectComponentsRequiresForPlayers.ts');
+
+require('services/keyboard-shortcut.service.ts');
 
 angular.module('oppia').component('explorationPlayerPage', {
   template: require('./exploration-player-page.component.html'),
@@ -60,6 +62,7 @@ angular.module('oppia').component('explorationPlayerPage', {
             // once the controller is migrated to angular.
             $rootScope.$apply();
           });
+        KeyboardShortcutService.bindExplorationPlayerShortcuts();
       };
     }
   ]

@@ -23,6 +23,8 @@ from constants import constants
 from core.domain import exp_domain
 from core.domain import exp_fetchers
 from core.domain import exp_services
+from core.domain import fs_services
+from core.domain import html_cleaner
 from core.domain import question_domain
 from core.domain import question_services
 from core.domain import skill_domain
@@ -58,10 +60,10 @@ class BaseSuggestion(python_utils.OBJECT):
             was last updated.
     """
 
-    def __init__(self):
+    def __init__(self, status, final_reviewer_id):
         """Initializes a Suggestion object."""
-        raise NotImplementedError(
-            'Subclasses of BaseSuggestion should implement __init__.')
+        self.status = status
+        self.final_reviewer_id = final_reviewer_id
 
     def to_dict(self):
         """Returns a dict representation of a suggestion object.
@@ -114,6 +116,26 @@ class BaseSuggestion(python_utils.OBJECT):
         return self.score_category.split(
             suggestion_models.SCORE_CATEGORY_DELIMITER)[1]
 
+    def set_suggestion_status_to_accepted(self):
+        """Sets the status of the suggestion to accepted."""
+        self.status = suggestion_models.STATUS_ACCEPTED
+
+    def set_suggestion_status_to_in_review(self):
+        """Sets the status of the suggestion to in review."""
+        self.status = suggestion_models.STATUS_IN_REVIEW
+
+    def set_suggestion_status_to_rejected(self):
+        """Sets the status of the suggestion to rejected."""
+        self.status = suggestion_models.STATUS_REJECTED
+
+    def set_final_reviewer_id(self, reviewer_id):
+        """Sets the final reviewer id of the suggestion to be reviewer_id.
+
+        Args:
+            reviewer_id: str. The ID of the user who completed the review.
+        """
+        self.final_reviewer_id = reviewer_id
+
     def validate(self):
         """Validates the BaseSuggestion object. Each subclass must implement
         this function.
@@ -121,7 +143,7 @@ class BaseSuggestion(python_utils.OBJECT):
         The subclasses must validate the change and score_category fields.
 
         Raises:
-            ValidationError: One or more attributes of the BaseSuggestion object
+            ValidationError. One or more attributes of the BaseSuggestion object
                 are invalid.
         """
         if (
@@ -249,6 +271,43 @@ class BaseSuggestion(python_utils.OBJECT):
             'Subclasses of BaseSuggestion should implement '
             'get_all_html_content_strings.')
 
+    def get_target_entity_html_strings(self):
+        """Gets all html content strings from target entity used in the
+        suggestion.
+        """
+        raise NotImplementedError(
+            'Subclasses of BaseSuggestion should implement '
+            'get_target_entity_html_strings.')
+
+    def get_new_image_filenames_added_in_suggestion(self):
+        """Returns the list of newly added image filenames in the suggestion.
+
+        Returns:
+            list(str). A list of newly added image filenames in the suggestion.
+        """
+        html_list = self.get_all_html_content_strings()
+        all_image_filenames = (
+            html_cleaner.get_image_filenames_from_html_strings(html_list))
+
+        target_entity_html_list = self.get_target_entity_html_strings()
+        target_image_filenames = (
+            html_cleaner.get_image_filenames_from_html_strings(
+                target_entity_html_list))
+
+        new_image_filenames = utils.compute_list_difference(
+            all_image_filenames, target_image_filenames)
+
+        return new_image_filenames
+
+    def _copy_new_images_to_target_entity_storage(self):
+        """Copy newly added images in suggestion to the target entity
+        storage.
+        """
+        new_image_filenames = self.get_new_image_filenames_added_in_suggestion()
+        fs_services.copy_images(
+            self.image_context, self.target_id, self.target_type,
+            self.target_id, new_image_filenames)
+
     def convert_html_in_suggestion_change(self, conversion_fn):
         """Checks for HTML fields in a suggestion change and converts it
         according to the conversion function.
@@ -272,31 +331,34 @@ class SuggestionEditStateContent(BaseSuggestion):
     SUGGESTION_TYPE_EDIT_STATE_CONTENT.
     """
 
-    def __init__( # pylint: disable=super-init-not-called
+    def __init__(
             self, suggestion_id, target_id, target_version_at_submission,
             status, author_id, final_reviewer_id,
             change, score_category, last_updated=None):
         """Initializes an object of type SuggestionEditStateContent
         corresponding to the SUGGESTION_TYPE_EDIT_STATE_CONTENT choice.
         """
+        super(SuggestionEditStateContent, self).__init__(
+            status, final_reviewer_id)
         self.suggestion_id = suggestion_id
         self.suggestion_type = (
             suggestion_models.SUGGESTION_TYPE_EDIT_STATE_CONTENT)
         self.target_type = suggestion_models.TARGET_TYPE_EXPLORATION
         self.target_id = target_id
         self.target_version_at_submission = target_version_at_submission
-        self.status = status
         self.author_id = author_id
-        self.final_reviewer_id = final_reviewer_id
         self.change = exp_domain.ExplorationChange(change)
         self.score_category = score_category
         self.last_updated = last_updated
+        # Currently, we don't allow adding images in the edit state content
+        # suggestion, so the image_context is None.
+        self.image_context = None
 
     def validate(self):
         """Validates a suggestion object of type SuggestionEditStateContent.
 
         Raises:
-            ValidationError: One or more attributes of the
+            ValidationError. One or more attributes of the
                 SuggestionEditStateContent object are invalid.
         """
         super(SuggestionEditStateContent, self).validate()
@@ -385,7 +447,7 @@ class SuggestionEditStateContent(BaseSuggestion):
             change: ExplorationChange. The new change.
 
         Raises:
-            ValidationError: Invalid new change.
+            ValidationError. Invalid new change.
         """
         if self.change.cmd != change.cmd:
             raise utils.ValidationError(
@@ -414,6 +476,18 @@ class SuggestionEditStateContent(BaseSuggestion):
             html_string_list.append(self.change.old_value['html'])
         return html_string_list
 
+    def get_target_entity_html_strings(self):
+        """Gets all html content strings from target entity used in the
+        suggestion.
+
+        Returns:
+            list(str). The list of html content strings from target entity used
+            in the suggestion.
+        """
+        if self.change.old_value is not None:
+            return [self.change.old_value['html']]
+
+        return []
 
     def convert_html_in_suggestion_change(self, conversion_fn):
         """Checks for HTML fields in a suggestion change and converts it
@@ -435,31 +509,32 @@ class SuggestionTranslateContent(BaseSuggestion):
     SUGGESTION_TYPE_TRANSLATE_CONTENT.
     """
 
-    def __init__( # pylint: disable=super-init-not-called
+    def __init__(
             self, suggestion_id, target_id, target_version_at_submission,
             status, author_id, final_reviewer_id,
             change, score_category, last_updated=None):
         """Initializes an object of type SuggestionTranslateContent
         corresponding to the SUGGESTION_TYPE_TRANSLATE_CONTENT choice.
         """
+        super(SuggestionTranslateContent, self).__init__(
+            status, final_reviewer_id)
         self.suggestion_id = suggestion_id
         self.suggestion_type = (
             suggestion_models.SUGGESTION_TYPE_TRANSLATE_CONTENT)
         self.target_type = suggestion_models.TARGET_TYPE_EXPLORATION
         self.target_id = target_id
         self.target_version_at_submission = target_version_at_submission
-        self.status = status
         self.author_id = author_id
-        self.final_reviewer_id = final_reviewer_id
         self.change = exp_domain.ExplorationChange(change)
         self.score_category = score_category
         self.last_updated = last_updated
+        self.image_context = feconf.IMAGE_CONTEXT_EXPLORATION_SUGGESTIONS
 
     def validate(self):
         """Validates a suggestion object of type SuggestionTranslateContent.
 
         Raises:
-            ValidationError: One or more attributes of the
+            ValidationError. One or more attributes of the
                 SuggestionTranslateContent object are invalid.
         """
         super(SuggestionTranslateContent, self).validate()
@@ -511,6 +586,7 @@ class SuggestionTranslateContent(BaseSuggestion):
         Args:
             commit_message: str. The commit message.
         """
+        self._copy_new_images_to_target_entity_storage()
         exp_services.update_exploration(
             self.final_reviewer_id, self.target_id, [self.change],
             commit_message, is_suggestion=True)
@@ -522,6 +598,16 @@ class SuggestionTranslateContent(BaseSuggestion):
             list(str). The list of html content strings.
         """
         return [self.change.translation_html, self.change.content_html]
+
+    def get_target_entity_html_strings(self):
+        """Gets all html content strings from target entity used in the
+        suggestion.
+
+        Returns:
+            list(str). The list of html content strings from target entity used
+            in the suggestion.
+        """
+        return [self.change.content_html]
 
     def convert_html_in_suggestion_change(self, conversion_fn):
         """Checks for HTML fields in a suggestion change and converts it
@@ -558,21 +644,20 @@ class SuggestionAddQuestion(BaseSuggestion):
             was last updated.
     """
 
-    def __init__( # pylint: disable=super-init-not-called
+    def __init__(
             self, suggestion_id, target_id, target_version_at_submission,
             status, author_id, final_reviewer_id,
             change, score_category, last_updated=None):
         """Initializes an object of type SuggestionAddQuestion
         corresponding to the SUGGESTION_TYPE_ADD_QUESTION choice.
         """
+        super(SuggestionAddQuestion, self).__init__(status, final_reviewer_id)
         self.suggestion_id = suggestion_id
         self.suggestion_type = suggestion_models.SUGGESTION_TYPE_ADD_QUESTION
         self.target_type = suggestion_models.TARGET_TYPE_SKILL
         self.target_id = target_id
         self.target_version_at_submission = target_version_at_submission
-        self.status = status
         self.author_id = author_id
-        self.final_reviewer_id = final_reviewer_id
         self.change = question_domain.QuestionSuggestionChange(change)
         # Update question_state_data_schema_version here instead of surfacing
         # the version in the frontend.
@@ -580,12 +665,13 @@ class SuggestionAddQuestion(BaseSuggestion):
             feconf.CURRENT_STATE_SCHEMA_VERSION)
         self.score_category = score_category
         self.last_updated = last_updated
+        self.image_context = feconf.IMAGE_CONTEXT_QUESTION_SUGGESTIONS
 
     def validate(self):
         """Validates a suggestion object of type SuggestionAddQuestion.
 
         Raises:
-            ValidationError: One or more attributes of the SuggestionAddQuestion
+            ValidationError. One or more attributes of the SuggestionAddQuestion
                 object are invalid.
         """
         super(SuggestionAddQuestion, self).validate()
@@ -631,7 +717,8 @@ class SuggestionAddQuestion(BaseSuggestion):
                 self.change.question_dict['question_state_data']),
             self.change.question_dict['question_state_data_schema_version'],
             self.change.question_dict['language_code'], None,
-            self.change.question_dict['linked_skill_ids'])
+            self.change.question_dict['linked_skill_ids'],
+            self.change.question_dict['inapplicable_misconception_ids'])
         question.partial_validate()
         question_state_data_schema_version = (
             self.change.question_dict['question_state_data_schema_version'])
@@ -682,7 +769,11 @@ class SuggestionAddQuestion(BaseSuggestion):
         question_dict['linked_skill_ids'] = [self.change.skill_id]
         question = question_domain.Question.from_dict(question_dict)
         question.validate()
+
+        self._copy_new_images_to_target_entity_storage()
+
         question_services.add_question(self.author_id, question)
+
         skill = skill_fetchers.get_skill_by_id(
             self.change.skill_id, strict=False)
         if skill is None:
@@ -696,7 +787,6 @@ class SuggestionAddQuestion(BaseSuggestion):
         """Populates old value of the change."""
         pass
 
-
     def pre_update_validate(self, change):
         """Performs the pre update validation. This functions need to be called
         before updating the suggestion.
@@ -705,7 +795,7 @@ class SuggestionAddQuestion(BaseSuggestion):
             change: QuestionChange. The new change.
 
         Raises:
-            ValidationError: Invalid new change.
+            ValidationError. Invalid new change.
         """
         if self.change.cmd != change.cmd:
             raise utils.ValidationError(
@@ -736,6 +826,12 @@ class SuggestionAddQuestion(BaseSuggestion):
         html_string_list = state_object.get_all_html_content_strings()
         return html_string_list
 
+    def get_target_entity_html_strings(self):
+        """Gets all html content strings from target entity used in the
+        suggestion.
+        """
+        return []
+
     def convert_html_in_suggestion_change(self, conversion_fn):
         """Checks for HTML fields in the suggestion change  and converts it
         according to the conversion function.
@@ -747,7 +843,12 @@ class SuggestionAddQuestion(BaseSuggestion):
         self.change.question_dict['question_state_data'] = (
             state_domain.State.convert_html_fields_in_state(
                 self.change.question_dict['question_state_data'],
-                conversion_fn))
+                conversion_fn,
+                state_uses_old_interaction_cust_args_schema=(
+                    self.change.question_dict[
+                        'question_state_data_schema_version'] < 37)
+            )
+        )
 
 
 class BaseVoiceoverApplication(python_utils.OBJECT):
@@ -799,7 +900,7 @@ class BaseVoiceoverApplication(python_utils.OBJECT):
         """Validates the BaseVoiceoverApplication object.
 
         Raises:
-            ValidationError: One or more attributes of the
+            ValidationError. One or more attributes of the
                 BaseVoiceoverApplication object are invalid.
         """
 

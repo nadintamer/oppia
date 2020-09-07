@@ -26,7 +26,7 @@ import { ExplorationPlayerConstants } from
 import { UrlInterpolationService } from
   'domain/utilities/url-interpolation.service';
 
-interface IStateStats {
+interface StateStats {
   'total_answers_count': number;
   'useful_feedback_count': number;
   'total_hit_count': number;
@@ -35,12 +35,12 @@ interface IStateStats {
   'num_completions': number;
 }
 
-export interface IAggregatedStats {
+export interface AggregatedStats {
   'num_starts': number;
   'num_completions': number;
   'num_actual_starts': number;
   'state_stats_mapping': {
-    [stateName: string]: IStateStats
+    [stateName: string]: StateStats
   };
 }
 
@@ -63,7 +63,8 @@ export class StatsReportingBackendApiService {
           exploration_id: explorationId
         });
     } catch (e) {
-      let additionalInfo = ('\nUndefined exploration id error debug logs:' +
+      let additionalInfo = (
+        '\nUndefined exploration id error debug logs:' +
         '\nThe event being recorded: ' + urlIdentifier +
         '\nExploration ID: ' + this.contextService.getExplorationId()
       );
@@ -88,7 +89,7 @@ export class StatsReportingBackendApiService {
   }
 
   postsStats(
-      aggregatedStats: IAggregatedStats, expVersion: number,
+      aggregatedStats: AggregatedStats, expVersion: number,
       explorationId: string, currentStateName: string, nextExpId: string,
       previousStateName: string, nextStateName: string): Promise<Object> {
     return this.http.post(this.getFullStatsUrl(

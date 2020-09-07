@@ -46,8 +46,11 @@ angular.module('oppia').directive('skillEditorMainTab', [
         '/pages/skill-editor-page/editor-tab/' +
         'skill-editor-main-tab.directive.html'),
       controller: [
-        '$scope', 'SkillEditorStateService', 'QuestionCreationService',
-        function($scope, SkillEditorStateService, QuestionCreationService) {
+        '$scope', 'PageTitleService', 'QuestionCreationService',
+        'SkillEditorStateService',
+        function(
+            $scope, PageTitleService, QuestionCreationService,
+            SkillEditorStateService) {
           var ctrl = this;
           $scope.createQuestion = function() {
             QuestionCreationService.createQuestion();
@@ -59,6 +62,7 @@ angular.module('oppia').directive('skillEditorMainTab', [
 
           $scope.getAssignedSkillTopicData = function() {
             if ($scope.assignedSkillTopicData) {
+              $scope.topicName = Object.keys($scope.assignedSkillTopicData)[0];
               return $scope.assignedSkillTopicData;
             }
             $scope.assignedSkillTopicData = (
@@ -86,6 +90,7 @@ angular.module('oppia').directive('skillEditorMainTab', [
             $scope.selectedTopic = null;
             $scope.assignedSkillTopicData = null;
             $scope.subtopicName = null;
+            PageTitleService.setPageTitleForMobileView('Skill Editor');
           };
         }
       ]

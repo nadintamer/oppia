@@ -56,10 +56,10 @@ describe('Logic demo test', function() {
       var line = 1;
       $scope.displayMessage(message, line);
 
-      expect($scope.proofError).toBe(' \n' +
-      'This is a mocked message to test the display message method' +
-      ' through \nunit tests and check if this message is going to be break' +
-      ' into lines \nthat has up to 70 lines.\n');
+      expect($scope.proofError).toBe(
+        ' \n' + 'This is a mocked message to test the display message method' +
+        ' through \nunit tests and check if this message is going to be break' +
+        ' into lines \nthat has up to 70 lines.\n');
     });
 
   it('should edit a proof', function() {
@@ -90,8 +90,8 @@ describe('Logic demo test', function() {
       ' have Q\u2227P\n');
     $scope.editProof();
 
-    expect($scope.proofError).toBe(' \n' +
-      'Checking if submit proof function will throw an error if' +
+    expect($scope.proofError).toBe(
+      ' \n' + 'Checking if submit proof function will throw an error if' +
       ' checkProof \nthrow an error as well and then this message' +
       ' should be formatted.\n');
 
@@ -125,8 +125,8 @@ describe('Logic demo test', function() {
     ));
 
     $scope.submitProof();
-    expect($scope.proofError).toBe(' \n' +
-      'Checking if submit proof function will throw an error if' +
+    expect($scope.proofError).toBe(
+      ' \n' + 'Checking if submit proof function will throw an error if' +
       ' checkProof \nthrow an error as well and then this message' +
       ' should be formatted.\n');
     expect($scope.checkSuccess).toBe(false);
@@ -476,11 +476,10 @@ describe('Logic demo test', function() {
 
   it('should submit mistakes', function() {
     const MISTAKE_STRINGS_LENGTH = 40;
-    // @ts-ignore logicProofTeacher2 buildMistakeSection method should return
-    // ore properties than entries according with lint settings.
-    spyOn(logicProofTeacher2, 'buildMistakeSection').and.returnValue([{
-      entries: []
-    }]);
+    spyOn(logicProofTeacher2, 'buildMistakeSection').and.returnValue({
+      entries: [],
+      name: ''
+    });
     var sectionNumber = 0;
     $scope.submitMistakes(sectionNumber);
 
@@ -502,13 +501,11 @@ describe('Logic demo test', function() {
   });
 
   it('should submit control functions', function() {
-    // @ts-ignore logicProofTeacher2 buildControlFunctionTable method should
-    // return more properties than {} according with lint settings.
-    spyOn(logicProofTeacher2, 'buildControlFunctionTable').and.returnValue({});
+    spyOn(logicProofTeacher2, 'buildControlFunctionTable').and.returnValue([]);
     $scope.submitControlFunctions();
 
     expect($scope.controlFunctionSuccess).toBe(true);
-    expect($scope.questionData.control_functions).toEqual({});
+    expect($scope.questionData.control_functions).toEqual([]);
   });
 
   it('should not submit control functions if building it throws an error',
@@ -539,14 +536,11 @@ describe('Logic demo test', function() {
   });
 
   it('should request javascript', function() {
-    // @ts-ignore logicProofTeacher2 buildMistakeSection method should return
-    // ore properties than entries according with lint settings.
-    spyOn(logicProofTeacher2, 'buildMistakeSection').and.returnValue([{
-      entries: []
-    }]);
-    // @ts-ignore logicProofTeacher2 buildControlFunctionTable method should
-    // return more properties than {} according with lint settings.
-    spyOn(logicProofTeacher2, 'buildControlFunctionTable').and.returnValue({});
+    spyOn(logicProofTeacher2, 'buildMistakeSection').and.returnValue({
+      entries: [],
+      name: ''
+    });
+    spyOn(logicProofTeacher2, 'buildControlFunctionTable').and.returnValue([]);
 
     $scope.submitMistakes(0);
     $scope.submitMistakes(1);

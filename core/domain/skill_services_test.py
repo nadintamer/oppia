@@ -26,6 +26,7 @@ from core.domain import skill_domain
 from core.domain import skill_fetchers
 from core.domain import skill_services
 from core.domain import state_domain
+from core.domain import topic_domain
 from core.domain import topic_services
 from core.domain import user_services
 from core.platform import models
@@ -72,8 +73,8 @@ class SkillServicesUnitTests(test_utils.GenericTestBase):
         self.SKILL_ID3 = skill_services.get_new_skill_id()
 
         self.signup('a@example.com', 'A')
-        self.signup(self.ADMIN_EMAIL, username=self.ADMIN_USERNAME)
-        self.signup('admin2@example.com', username='adm2')
+        self.signup(self.ADMIN_EMAIL, self.ADMIN_USERNAME)
+        self.signup('admin2@example.com', 'adm2')
 
         self.user_id_a = self.get_user_id_from_email('a@example.com')
         self.user_id_admin = self.get_user_id_from_email(self.ADMIN_EMAIL)
@@ -413,6 +414,7 @@ class SkillServicesUnitTests(test_utils.GenericTestBase):
         topic_id = topic_services.get_new_topic_id()
         self.save_new_topic(
             topic_id, self.USER_ID, name='topic1',
+            abbreviated_name='topic-one', url_fragment='topic-one',
             description='Description',
             canonical_story_ids=[],
             additional_story_ids=[],
@@ -456,6 +458,7 @@ class SkillServicesUnitTests(test_utils.GenericTestBase):
         topic_id = topic_services.get_new_topic_id()
         self.save_new_topic(
             topic_id, self.USER_ID, name='topic1',
+            abbreviated_name='topic-two', url_fragment='topic-two',
             description='Description',
             canonical_story_ids=[],
             additional_story_ids=[],
@@ -463,8 +466,14 @@ class SkillServicesUnitTests(test_utils.GenericTestBase):
             subtopics=[], next_subtopic_id=1)
 
         config_services.set_property(
-            self.user_id_admin, 'topic_ids_for_classroom_pages', [{
-                'name': 'math', 'topic_ids': [topic_id]}])
+            self.user_id_admin, 'classroom_pages_data', [{
+                'url_fragment': 'math',
+                'name': 'math',
+                'topic_ids': [topic_id],
+                'topic_list_intro': 'Topics Covered',
+                'course_details': 'Course Details'
+            }]
+        )
 
         augmented_skill_summaries, next_cursor, more = (
             skill_services.get_filtered_skill_summaries(
@@ -547,6 +556,82 @@ class SkillServicesUnitTests(test_utils.GenericTestBase):
         self.assertEqual(len(augmented_skill_summaries), 2)
         self.assertEqual(next_cursor, None)
         self.assertFalse(more)
+
+    def test_get_all_topic_assignments_for_skill(self):
+        topic_id = topic_services.get_new_topic_id()
+        topic_id_1 = topic_services.get_new_topic_id()
+        self.save_new_topic(
+            topic_id, self.USER_ID, name='Topic1',
+            abbreviated_name='topic-three', url_fragment='topic-three',
+            description='Description',
+            canonical_story_ids=[],
+            additional_story_ids=[],
+            uncategorized_skill_ids=[self.SKILL_ID],
+            subtopics=[], next_subtopic_id=1)
+
+        subtopic = topic_domain.Subtopic.from_dict({
+            'id': 1,
+            'title': 'subtopic1',
+            'skill_ids': [self.SKILL_ID],
+            'thumbnail_filename': None,
+            'thumbnail_bg_color': None,
+            'url_fragment': 'subtopic-one'
+        })
+        self.save_new_topic(
+            topic_id_1, self.USER_ID, name='Topic2',
+            abbreviated_name='topic-four', url_fragment='topic-four',
+            description='Description2', canonical_story_ids=[],
+            additional_story_ids=[],
+            uncategorized_skill_ids=[],
+            subtopics=[subtopic], next_subtopic_id=2)
+
+        topic_assignments = (
+            skill_services.get_all_topic_assignments_for_skill(self.SKILL_ID))
+        topic_assignments = sorted(
+            topic_assignments, key=lambda i: i.topic_name)
+        self.assertEqual(len(topic_assignments), 2)
+        self.assertEqual(topic_assignments[0].topic_name, 'Topic1')
+        self.assertEqual(topic_assignments[0].topic_id, topic_id)
+        self.assertEqual(topic_assignments[0].topic_version, 1)
+        self.assertIsNone(topic_assignments[0].subtopic_id)
+
+        self.assertEqual(topic_assignments[1].topic_name, 'Topic2')
+        self.assertEqual(topic_assignments[1].topic_id, topic_id_1)
+        self.assertEqual(topic_assignments[1].topic_version, 1)
+        self.assertEqual(topic_assignments[1].subtopic_id, 1)
+
+    def test_remove_skill_from_all_topics(self):
+        topic_id = topic_services.get_new_topic_id()
+        topic_id_1 = topic_services.get_new_topic_id()
+        self.save_new_topic(
+            topic_id, self.USER_ID, name='Topic1',
+            abbreviated_name='topic-five', url_fragment='topic-five',
+            description='Description',
+            canonical_story_ids=[],
+            additional_story_ids=[],
+            uncategorized_skill_ids=[self.SKILL_ID],
+            subtopics=[], next_subtopic_id=1)
+
+        subtopic = topic_domain.Subtopic.from_dict({
+            'id': 1,
+            'title': 'subtopic1',
+            'skill_ids': [self.SKILL_ID],
+            'thumbnail_filename': None,
+            'thumbnail_bg_color': None,
+            'url_fragment': 'subtopic-one'
+        })
+        self.save_new_topic(
+            topic_id_1, self.USER_ID, name='Topic2',
+            abbreviated_name='topic-six', url_fragment='topic-six',
+            description='Description2', canonical_story_ids=[],
+            additional_story_ids=[],
+            uncategorized_skill_ids=[],
+            subtopics=[subtopic], next_subtopic_id=2)
+
+        skill_services.remove_skill_from_all_topics(self.USER_ID, self.SKILL_ID)
+        topic_assignments_dict = (
+            skill_services.get_all_topic_assignments_for_skill(self.SKILL_ID))
+        self.assertEqual(len(topic_assignments_dict), 0)
 
     def test_update_skill(self):
         changelist = [
@@ -662,7 +747,6 @@ class SkillServicesUnitTests(test_utils.GenericTestBase):
         skill = skill_fetchers.get_skill_by_id(self.SKILL_ID)
         self.assertEqual(skill.version, 2)
         self.assertEqual(skill.all_questions_merged, True)
-
 
     def test_get_merged_skill_ids(self):
         skill_ids = skill_services.get_merged_skill_ids()
@@ -903,7 +987,8 @@ class SkillServicesUnitTests(test_utils.GenericTestBase):
             observed_log_messages.append(msg % args)
 
         logging_swap = self.swap(logging, 'error', _mock_logging_function)
-        assert_raises_context_manager = self.assertRaises(Exception)
+        assert_raises_context_manager = self.assertRaisesRegexp(
+            Exception, '\'unicode\' object has no attribute \'cmd\'')
 
         with logging_swap, assert_raises_context_manager:
             skill_services.update_skill(
@@ -1147,11 +1232,13 @@ class SkillMigrationTests(test_utils.GenericTestBase):
             'translations_mapping': {
                 'content1': {
                     'en': {
-                        'html': '',
+                        'data_format': 'html',
+                        'translation': '',
                         'needs_update': True
                     },
                     'hi': {
-                        'html': 'Hey!',
+                        'data_format': 'html',
+                        'translation': 'Hey!',
                         'needs_update': False
                     }
                 }
@@ -1161,11 +1248,13 @@ class SkillMigrationTests(test_utils.GenericTestBase):
             'translations_mapping': {
                 'content1': {
                     'en': {
-                        'html': expected_html_content,
+                        'data_format': 'html',
+                        'translation': expected_html_content,
                         'needs_update': True
                     },
                     'hi': {
-                        'html': 'Hey!',
+                        'data_format': 'html',
+                        'translation': 'Hey!',
                         'needs_update': False
                     }
                 }
@@ -1205,8 +1294,8 @@ class SkillMigrationTests(test_utils.GenericTestBase):
                 written_translations_dict))
         skill_contents_dict = skill_contents.to_dict()
         skill_contents_dict['explanation']['html'] = html_content
-        skill_contents_dict['written_translations'][
-            'translations_mapping']['content1']['en']['html'] = html_content
+        skill_contents_dict['written_translations']['translations_mapping'][
+            'content1']['en']['translation'] = html_content
         skill_contents_dict['worked_examples'][0]['question']['html'] = (
             html_content)
         skill_contents_dict['worked_examples'][0]['explanation']['html'] = (

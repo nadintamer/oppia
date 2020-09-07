@@ -30,6 +30,7 @@ from core.domain import exp_domain
 from core.domain import exp_services
 from core.domain import feedback_services
 from core.domain import rating_services
+from core.domain import rights_domain
 from core.domain import rights_manager
 from core.domain import subscription_services
 from core.domain import user_jobs_continuous
@@ -196,6 +197,165 @@ class UserContributionsOneOffJobTests(test_utils.GenericTestBase):
             ['exp_id'])
 
 
+class PopulateUserAuthDetailsModelOneOffJobTests(test_utils.GenericTestBase):
+    """Tests for the one-off PopulateUserAuthDetailsModel migration job."""
+
+    USER_A_EMAIL = 'a@example.com'
+    USER_A_ID = 'uid_voxecidnxaqdvhmoilhxxgeixffkauxc'
+    USER_A_GAE_ID = 'user_a_gae_id'
+    USER_B_EMAIL = 'b@example.com'
+    USER_B_ID = 'uid_mjmohemylmjjdqredntquhfvcyuindem'
+    USER_B_GAE_ID = 'user_b_gae_id'
+
+    def _run_one_off_job(self):
+        """Runs the one-off MapReduce job."""
+        job_id = (
+            user_jobs_one_off.PopulateUserAuthDetailsModelOneOffJob.
+            create_new()
+        )
+        user_jobs_one_off.PopulateUserAuthDetailsModelOneOffJob.enqueue(job_id)
+        self.assertEqual(
+            self.count_jobs_in_taskqueue(
+                taskqueue_services.QUEUE_NAME_ONE_OFF_JOBS), 1)
+        self.process_and_flush_pending_tasks()
+
+        stringified_output = (
+            user_jobs_one_off.PopulateUserAuthDetailsModelOneOffJob.get_output(
+                job_id))
+        output = {}
+        for stringified_distribution in stringified_output:
+            message_list = ast.literal_eval(stringified_distribution)
+            # The following is output:
+            # ['SUCCESS - Created UserAuthDetails model'] = number of users.
+            output[message_list[0]] = int(message_list[1])
+        return output
+
+    def setUp(self):
+        super(PopulateUserAuthDetailsModelOneOffJobTests, self).setUp()
+        user_models.UserSettingsModel.get_by_id(
+            self.get_user_id_from_email('tmpsuperadmin@example.com')).delete()
+        self.user_a_model = user_models.UserSettingsModel(
+            id=self.USER_A_ID,
+            gae_id=self.USER_A_GAE_ID,
+            email=self.USER_A_EMAIL,
+        )
+        self.user_b_model = user_models.UserSettingsModel(
+            id=self.USER_B_ID,
+            gae_id=self.USER_B_GAE_ID,
+            email=self.USER_B_EMAIL
+        )
+        self.user_a_model.put()
+        self.user_b_model.put()
+
+    def test_before_migration_old_users_do_not_exist_in_user_auth_model(self):
+        self.assertIsNone(user_models.UserAuthDetailsModel.get_by_id(
+            self.USER_A_ID))
+        self.assertIsNone(user_models.UserAuthDetailsModel.get_by_id(
+            self.USER_B_ID))
+
+    def test_one_off_job_migrates_old_users_successfully(self):
+
+        self.assertIsNone(user_models.UserAuthDetailsModel.get_by_id(
+            self.USER_A_ID))
+        self.assertIsNone(user_models.UserAuthDetailsModel.get_by_id(
+            self.USER_B_ID))
+
+        output = self._run_one_off_job()
+        expected_output = {
+            'SUCCESS - Created UserAuthDetails model': 2
+        }
+        self.assertEqual(output, expected_output)
+
+        user_auth_details_model = (
+            user_models.UserAuthDetailsModel.get_by_auth_id(
+                feconf.AUTH_METHOD_GAE, self.USER_A_GAE_ID)
+        )
+        self.assertEqual(user_auth_details_model.id, self.USER_A_ID)
+        user_auth_details_model = (
+            user_models.UserAuthDetailsModel.get_by_auth_id(
+                feconf.AUTH_METHOD_GAE, self.USER_B_GAE_ID)
+        )
+        self.assertEqual(user_auth_details_model.id, self.USER_B_ID)
+
+    def test_one_off_job_migrates_old_and_new_users_combined_successfully(self):
+        new_gae_id = 'new_gae_id'
+        new_email = 'new@example.com'
+        user_services.create_new_user(new_gae_id, new_email)
+        new_user_id = user_services.get_user_settings_by_gae_id(
+            new_gae_id).user_id
+        user_auth_details_model = (
+            user_models.UserAuthDetailsModel.get_by_auth_id(
+                feconf.AUTH_METHOD_GAE, new_gae_id)
+        )
+        # To ensure that UserAuthDetailsModel was created for newly registered
+        # user.
+        self.assertEqual(user_auth_details_model.id, new_user_id)
+
+        self.assertIsNone(user_models.UserAuthDetailsModel.get_by_id(
+            self.USER_A_ID))
+        self.assertIsNone(user_models.UserAuthDetailsModel.get_by_id(
+            self.USER_B_ID))
+
+        output = self._run_one_off_job()
+        expected_output = {
+            'SUCCESS - Created UserAuthDetails model': 3
+        }
+        self.assertEqual(output, expected_output)
+
+        user_auth_details_model = (
+            user_models.UserAuthDetailsModel.get_by_auth_id(
+                feconf.AUTH_METHOD_GAE, self.USER_A_GAE_ID)
+        )
+        self.assertEqual(user_auth_details_model.id, self.USER_A_ID)
+        user_auth_details_model = (
+            user_models.UserAuthDetailsModel.get_by_auth_id(
+                feconf.AUTH_METHOD_GAE, self.USER_B_GAE_ID)
+        )
+        self.assertEqual(user_auth_details_model.id, self.USER_B_ID)
+        user_auth_details_model = (
+            user_models.UserAuthDetailsModel.get_by_auth_id(
+                feconf.AUTH_METHOD_GAE, new_gae_id)
+        )
+        self.assertEqual(user_auth_details_model.id, new_user_id)
+
+    def test_one_off_job_run_multiple_times_fills_auth_model_correctly(self):
+        expected_output = {
+            'SUCCESS - Created UserAuthDetails model': 2
+        }
+        output = self._run_one_off_job()
+        self.assertEqual(output, expected_output)
+        output = self._run_one_off_job()
+        self.assertEqual(output, expected_output)
+        user_auth_details_model = (
+            user_models.UserAuthDetailsModel.get_by_auth_id(
+                feconf.AUTH_METHOD_GAE, self.USER_A_GAE_ID)
+        )
+        self.assertEqual(user_auth_details_model.id, self.USER_A_ID)
+        user_auth_details_model = (
+            user_models.UserAuthDetailsModel.get_by_auth_id(
+                feconf.AUTH_METHOD_GAE, self.USER_B_GAE_ID)
+        )
+        self.assertEqual(user_auth_details_model.id, self.USER_B_ID)
+
+    def test_mark_user_for_deletion_for_migrated_old_users_is_correct(self):
+        self._run_one_off_job()
+        user_auth_details_model = (
+            user_models.UserAuthDetailsModel.get_by_auth_id(
+                feconf.AUTH_METHOD_GAE, self.USER_A_GAE_ID)
+        )
+        self.assertEqual(user_auth_details_model.id, self.USER_A_ID)
+        self.assertFalse(user_auth_details_model.deleted)
+        user_services.mark_user_for_deletion(self.USER_A_ID)
+
+        self._run_one_off_job()
+        user_auth_details_model = (
+            user_models.UserAuthDetailsModel.get_by_auth_id(
+                feconf.AUTH_METHOD_GAE, self.USER_A_GAE_ID)
+        )
+        self.assertEqual(user_auth_details_model.id, self.USER_A_ID)
+        self.assertTrue(user_auth_details_model.deleted)
+
+
 class UsernameLengthDistributionOneOffJobTests(test_utils.GenericTestBase):
     """Tests for the one-off username length distribution job."""
 
@@ -220,7 +380,6 @@ class UsernameLengthDistributionOneOffJobTests(test_utils.GenericTestBase):
         stringified_output = (
             user_jobs_one_off.UsernameLengthDistributionOneOffJob.get_output(
                 job_id))
-
         output = {}
         for stringified_distribution in stringified_output:
             value = re.findall(r'\d+', stringified_distribution)
@@ -518,11 +677,11 @@ class DashboardSubscriptionsOneOffJobTests(test_utils.GenericTestBase):
             # User A adds user B as an editor to the exploration.
             rights_manager.assign_role_for_exploration(
                 self.user_a, self.EXP_ID_1, self.user_b_id,
-                rights_manager.ROLE_EDITOR)
+                rights_domain.ROLE_EDITOR)
             # User A adds user C as a viewer of the exploration.
             rights_manager.assign_role_for_exploration(
                 self.user_a, self.EXP_ID_1, self.user_c_id,
-                rights_manager.ROLE_VIEWER)
+                rights_domain.ROLE_VIEWER)
 
         self._run_one_off_job()
 
@@ -570,7 +729,7 @@ class DashboardSubscriptionsOneOffJobTests(test_utils.GenericTestBase):
             # User A adds user B as an editor to the exploration.
             rights_manager.assign_role_for_exploration(
                 self.user_a, self.EXP_ID_1, self.user_b_id,
-                rights_manager.ROLE_EDITOR)
+                rights_domain.ROLE_EDITOR)
             # The exploration becomes community-owned.
             rights_manager.publish_exploration(self.user_a, self.EXP_ID_1)
             rights_manager.release_ownership_of_exploration(
@@ -629,11 +788,11 @@ class DashboardSubscriptionsOneOffJobTests(test_utils.GenericTestBase):
             # User A adds user B as an editor to the collection.
             rights_manager.assign_role_for_collection(
                 self.user_a, self.COLLECTION_ID_1, self.user_b_id,
-                rights_manager.ROLE_EDITOR)
+                rights_domain.ROLE_EDITOR)
             # User A adds user C as a viewer of the collection.
             rights_manager.assign_role_for_collection(
                 self.user_a, self.COLLECTION_ID_1, self.user_c_id,
-                rights_manager.ROLE_VIEWER)
+                rights_domain.ROLE_VIEWER)
 
         self._run_one_off_job()
 
@@ -773,7 +932,7 @@ class DashboardSubscriptionsOneOffJobTests(test_utils.GenericTestBase):
             # User A adds user B as an editor to the collection.
             rights_manager.assign_role_for_collection(
                 self.user_a, self.COLLECTION_ID_1, self.user_b_id,
-                rights_manager.ROLE_EDITOR)
+                rights_domain.ROLE_EDITOR)
 
             # The collection becomes community-owned.
             rights_manager.publish_collection(self.user_a, self.COLLECTION_ID_1)
@@ -1130,6 +1289,19 @@ class UserFirstContributionMsecOneOffJobTests(test_utils.GenericTestBase):
                 'state_name': init_state_name,
                 'property_name': 'widget_id',
                 'new_value': 'MultipleChoiceInput'
+            }), exp_domain.ExplorationChange({
+                'cmd': 'edit_state_property',
+                'state_name': init_state_name,
+                'property_name': 'widget_customization_args',
+                'new_value': {
+                    'choices': {
+                        'value': [{
+                            'content_id': 'ca_choices_0',
+                            'html': '<p>Choice 1</p>'
+                        }]
+                    },
+                    'showChoicesInShuffledOrder': {'value': True}
+                }
             })], 'commit')
         job_id = (
             user_jobs_one_off.UserFirstContributionMsecOneOffJob.create_new())
@@ -1366,12 +1538,13 @@ class CleanupUserSubscriptionsModelUnitTests(test_utils.GenericTestBase):
             exp_models.ExplorationModel.get('%s' % exp_id).delete(
                 self.owner_id, 'deleted exploration')
 
-        self.assertEqual(
-            len(user_models.UserSubscriptionsModel.get(self.owner_id)
-                .activity_ids), 3)
-        self.assertEqual(
-            len(user_models.UserSubscriptionsModel.get(self.user_id)
-                .activity_ids), 3)
+        owner_subscription_model = user_models.UserSubscriptionsModel.get(
+            self.owner_id)
+        self.assertEqual(len(owner_subscription_model.activity_ids), 3)
+
+        user_subscription_model = user_models.UserSubscriptionsModel.get(
+            self.user_id)
+        self.assertEqual(len(user_subscription_model.activity_ids), 3)
 
         job = user_jobs_one_off.CleanupActivityIdsFromUserSubscriptionsModelOneOffJob # pylint: disable=line-too-long
         job_id = job.create_new()
@@ -1381,12 +1554,13 @@ class CleanupUserSubscriptionsModelUnitTests(test_utils.GenericTestBase):
                 taskqueue_services.QUEUE_NAME_ONE_OFF_JOBS), 1)
         self.process_and_flush_pending_tasks()
 
-        self.assertEqual(
-            len(user_models.UserSubscriptionsModel.get(self.owner_id)
-                .activity_ids), 0)
-        self.assertEqual(
-            len(user_models.UserSubscriptionsModel.get(self.user_id)
-                .activity_ids), 0)
+        owner_subscription_model = user_models.UserSubscriptionsModel.get(
+            self.owner_id)
+        self.assertEqual(len(owner_subscription_model.activity_ids), 0)
+
+        user_subscription_model = user_models.UserSubscriptionsModel.get(
+            self.user_id)
+        self.assertEqual(len(user_subscription_model.activity_ids), 0)
         actual_output = job.get_output(job_id)
         expected_output = [
             u'[u\'Successfully cleaned up UserSubscriptionsModel %s and '

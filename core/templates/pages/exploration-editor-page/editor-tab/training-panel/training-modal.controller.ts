@@ -17,7 +17,7 @@
  */
 require(
   'pages/exploration-editor-page/editor-tab/training-panel/' +
-  'training-panel.directive.ts');
+  'training-panel.component.ts');
 
 require('domain/exploration/AnswerGroupObjectFactory.ts');
 require('domain/utilities/url-interpolation.service.ts');
@@ -63,7 +63,8 @@ angular.module('oppia').controller('TrainingModalController', [
   'ExplorationStatesService', 'ExplorationWarningsService', 'GraphDataService',
   'ResponsesService', 'StateEditorService', 'StateInteractionIdService',
   'TrainingDataService', 'finishTrainingCallback', 'unhandledAnswer',
-  function($injector, $scope, $uibModalInstance, AngularNameService,
+  function(
+      $injector, $scope, $uibModalInstance, AngularNameService,
       AnswerClassificationService, AnswerGroupObjectFactory,
       ExplorationStatesService, ExplorationWarningsService, GraphDataService,
       ResponsesService, StateEditorService, StateInteractionIdService,

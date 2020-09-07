@@ -70,6 +70,10 @@ class StoryModel(base_models.VersionedModel):
         ndb.IntegerProperty(required=True, indexed=True))
     # The topic id to which the story belongs.
     corresponding_topic_id = ndb.StringProperty(indexed=True, required=True)
+    # The url fragment for the story.
+    url_fragment = ndb.StringProperty(required=True, indexed=True)
+    # The content of the meta tag in the Story viewer page.
+    meta_tag_content = ndb.StringProperty(indexed=True)
 
     @staticmethod
     def get_deletion_policy():
@@ -116,10 +120,39 @@ class StoryModel(base_models.VersionedModel):
         story_commit_log_entry.story_id = self.id
         story_commit_log_entry.put()
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Model does not contain user data."""
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'title': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'thumbnail_filename': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'thumbnail_bg_color': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'description': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'notes': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'language_code': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'story_contents': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'story_contents_schema_version':
+                base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'corresponding_topic_id': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'url_fragment': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'meta_tag_content': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
+
+    @classmethod
+    def get_by_url_fragment(cls, url_fragment):
+        """Gets StoryModel by url_fragment. Returns None if the story with
+        name url_fragment doesn't exist.
+
+        Args:
+            url_fragment: str. The url fragment of the story.
+
+        Returns:
+            StoryModel|None. The story model of the story or None if not
+            found.
+        """
+        return StoryModel.query().filter(
+            cls.url_fragment == url_fragment).filter(
+                cls.deleted == False).get() # pylint: disable=singleton-comparison
 
 
 class StoryCommitLogEntryModel(base_models.BaseCommitLogEntryModel):
@@ -155,12 +188,14 @@ class StoryCommitLogEntryModel(base_models.BaseCommitLogEntryModel):
         """
         return 'story-%s-%s' % (story_id, version)
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """This model is only stored for archive purposes. The commit log of
         entities is not related to personal user data.
         """
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'story_id': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })
 
 
 class StorySummaryModel(base_models.BaseModel):
@@ -197,6 +232,8 @@ class StorySummaryModel(base_models.BaseModel):
     # The thumbnail background color of the story.
     thumbnail_bg_color = ndb.StringProperty(indexed=True)
     version = ndb.IntegerProperty(required=True)
+    # The url fragment for the story.
+    url_fragment = ndb.StringProperty(required=True, indexed=True)
 
     @staticmethod
     def get_deletion_policy():
@@ -218,7 +255,19 @@ class StorySummaryModel(base_models.BaseModel):
         """
         return False
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Model does not contain user data."""
-        return base_models.EXPORT_POLICY.NOT_APPLICABLE
+        return dict(super(cls, cls).get_export_policy(), **{
+            'title': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'language_code': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'description': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'story_model_last_updated':
+                base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'story_model_created_on': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'node_titles': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'thumbnail_filename': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'thumbnail_bg_color': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'version': base_models.EXPORT_POLICY.NOT_APPLICABLE,
+            'url_fragment': base_models.EXPORT_POLICY.NOT_APPLICABLE
+        })

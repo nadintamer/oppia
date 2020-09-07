@@ -18,8 +18,13 @@
 
 // TODO(#7222): Remove the following block of unnnecessary imports once
 // App.ts is upgraded to Angular 8.
+
 import { UpgradedServices } from 'services/UpgradedServices';
 // ^^^ This block is to be removed.
+
+import { TestBed } from '@angular/core/testing';
+
+import { KeyboardShortcutService } from 'services/keyboard-shortcut.service';
 
 require('pages/exploration-player-page/exploration-player-page.component.ts');
 
@@ -36,6 +41,18 @@ describe('Exploration player page', function() {
     title: 'Exploration Title',
     objective: 'Exploration Objective',
   };
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [KeyboardShortcutService]
+    });
+  });
+
+  beforeEach(angular.mock.module('oppia', function($provide) {
+    $provide.value(
+      'KeyboardShortcutService',
+      TestBed.get(KeyboardShortcutService));
+  }));
 
   beforeEach(angular.mock.module('oppia', function($provide) {
     var ugs = new UpgradedServices();
@@ -72,27 +89,19 @@ describe('Exploration player page', function() {
 
     var elementNameItemProp = $('<div>');
     angularElementSpy.withArgs(
-      // @ts-ignore Angular element method doesn't expect to receive 1 argument
-      // in the lints.
       'meta[itemprop="name"]').and.returnValue(elementNameItemProp);
 
     var elementDescriptionItemProp = $('<div>');
     angularElementSpy.withArgs(
-      // @ts-ignore Angular element method doesn't expect to receive 1 argument
-      // in the lints.
       'meta[itemprop="description"]').and.returnValue(
       elementDescriptionItemProp);
 
     var elementTitleProperty = $('<div>');
     angularElementSpy.withArgs(
-      // @ts-ignore Angular element method doesn't expect to receive 1 argument
-      // in the lints.
       'meta[property="og:title"]').and.returnValue(elementTitleProperty);
 
     var elementDescriptionProperty = $('<div>');
     angularElementSpy.withArgs(
-      // @ts-ignore Angular element method doesn't expect to receive 1 argument
-      // in the lints.
       'meta[property="og:description"]').and.returnValue(
       elementDescriptionProperty);
 

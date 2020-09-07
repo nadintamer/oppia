@@ -26,6 +26,9 @@ import { StatisticsDomainConstants } from
 describe('Learner Action Object Factory', () => {
   var learnerActionObjectFactory: LearnerActionObjectFactory;
 
+  const LEARNER_ACTION_SCHEMA_LATEST_VERSION =
+      StatisticsDomainConstants.LEARNER_ACTION_SCHEMA_LATEST_VERSION;
+
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [LearnerActionObjectFactory]
@@ -33,8 +36,6 @@ describe('Learner Action Object Factory', () => {
 
     learnerActionObjectFactory =
       TestBed.get(LearnerActionObjectFactory);
-    this.LEARNER_ACTION_SCHEMA_LATEST_VERSION =
-      StatisticsDomainConstants.LEARNER_ACTION_SCHEMA_LATEST_VERSION;
   });
 
   it('should create a new learner action', () => {
@@ -97,7 +98,7 @@ describe('Learner Action Object Factory', () => {
       }
     });
     expect(answerSubmitlearnerActionObject.schemaVersion)
-      .toEqual(this.LEARNER_ACTION_SCHEMA_LATEST_VERSION);
+      .toEqual(LEARNER_ACTION_SCHEMA_LATEST_VERSION);
     expect(explorationStartlearnerActionObject.actionType).toEqual(
       'ExplorationStart');
     expect(
@@ -107,7 +108,7 @@ describe('Learner Action Object Factory', () => {
       }
     });
     expect(explorationStartlearnerActionObject.schemaVersion)
-      .toEqual(this.LEARNER_ACTION_SCHEMA_LATEST_VERSION);
+      .toEqual(LEARNER_ACTION_SCHEMA_LATEST_VERSION);
     expect(explorationQuitlearnerActionObject.actionType).toEqual(
       'ExplorationQuit');
     expect(
@@ -120,7 +121,7 @@ describe('Learner Action Object Factory', () => {
       }
     });
     expect(explorationQuitlearnerActionObject.schemaVersion)
-      .toEqual(this.LEARNER_ACTION_SCHEMA_LATEST_VERSION);
+      .toEqual(LEARNER_ACTION_SCHEMA_LATEST_VERSION);
   });
 
   it('should create a new learner action from a backend dict', () => {
@@ -208,9 +209,11 @@ describe('Learner Action Object Factory', () => {
     };
 
     expect(() => {
-      // TS ignore is used because playthrough dict is assigned a invalid type
-      // to test errors.
-      // @ts-ignore
+      // This throws "Type 'string' is not assignable to type
+      // '"ExplorationQuit"'." This is because 'playthroughDict' has an
+      // invalid value of 'action_type' property. We need to do that in order
+      // to test validations.
+      // @ts-expect-error
       learnerActionObjectFactory.createFromBackendDict(playthroughDict);
     }).toThrowError(
       'Backend dict does not match any known action type: ' +

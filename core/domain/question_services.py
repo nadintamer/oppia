@@ -38,7 +38,7 @@ def create_new_question(committer_id, question, commit_message):
 
     Args:
         committer_id: str. ID of the committer.
-        question: Question. question domain object.
+        question: Question. Question domain object.
         commit_message: str. A description of changes made to the question.
     """
     question.validate()
@@ -49,7 +49,9 @@ def create_new_question(committer_id, question, commit_message):
         version=question.version,
         linked_skill_ids=question.linked_skill_ids,
         question_state_data_schema_version=(
-            question.question_state_data_schema_version)
+            question.question_state_data_schema_version),
+        inapplicable_misconception_ids=(
+            question.inapplicable_misconception_ids)
     )
     model.commit(
         committer_id, commit_message, [{'cmd': question_domain.CMD_CREATE_NEW}])
@@ -74,7 +76,7 @@ def link_multiple_skills_for_question(
 
     Raises:
         Exception. The lengths of the skill_ids and skill_difficulties
-        lists are different.
+            lists are different.
     """
     if len(skill_ids) != len(skill_difficulties):
         raise Exception(
@@ -167,9 +169,10 @@ def _update_linked_skill_ids_of_question(
     change_list = [question_domain.QuestionChange(change_dict)]
     update_question(
         user_id, question_id, change_list, 'Updated linked skill ids')
-    (opportunity_services
-     .update_skill_opportunities_on_question_linked_skills_change(
-         old_linked_skill_ids, new_linked_skill_ids))
+    (
+        opportunity_services
+        .update_skill_opportunities_on_question_linked_skills_change(
+            old_linked_skill_ids, new_linked_skill_ids))
 
 
 def delete_question_skill_link(user_id, question_id, skill_id):
@@ -199,6 +202,24 @@ def delete_question_skill_link(user_id, question_id, skill_id):
         delete_question(user_id, question_id)
 
     question_skill_link_model.delete()
+
+
+def get_total_question_count_for_skill_ids(skill_ids):
+    """Returns the number of questions assigned to the given skill_ids.
+
+    Args:
+        skill_ids: list(str). Skill IDs for which the question count is
+            requested.
+
+    Returns:
+        int. The total number of questions assigned to the given skill_ids.
+    """
+    question_skill_link_model = question_models.QuestionSkillLinkModel
+    question_count = (
+        question_skill_link_model.get_total_question_count_for_skill_ids(
+            skill_ids))
+
+    return question_count
 
 
 def get_questions_by_skill_ids(
@@ -232,13 +253,14 @@ def get_questions_by_skill_ids(
 
     if require_medium_difficulty:
         question_skill_link_models = (
-            question_models.QuestionSkillLinkModel.get_question_skill_links_based_on_difficulty_equidistributed_by_skill( #pylint: disable=line-too-long
+            question_models.QuestionSkillLinkModel.get_question_skill_links_based_on_difficulty_equidistributed_by_skill( # pylint: disable=line-too-long
                 total_question_count, skill_ids,
                 constants.SKILL_DIFFICULTY_LABEL_TO_FLOAT[
                     constants.SKILL_DIFFICULTY_MEDIUM]))
     else:
         question_skill_link_models = (
-            question_models.QuestionSkillLinkModel.get_question_skill_links_equidistributed_by_skill( #pylint: disable=line-too-long
+            question_models.QuestionSkillLinkModel.
+            get_question_skill_links_equidistributed_by_skill(
                 total_question_count, skill_ids))
 
     question_ids = [model.question_id for model in question_skill_link_models]
@@ -419,7 +441,7 @@ def get_displayable_question_skill_link_details(
 
     Raises:
         Exception. Querying linked question summaries for more than 3 skills at
-        a time is not supported currently.
+            a time is not supported currently.
 
     Returns:
         list(QuestionSummary), list(MergedQuestionSkillLink), str|None.
@@ -436,7 +458,8 @@ def get_displayable_question_skill_link_details(
             'Querying linked question summaries for more than 3 skills at a '
             'time is not supported currently.')
     question_skill_link_models, next_cursor = (
-        question_models.QuestionSkillLinkModel.get_question_skill_links_by_skill_ids( #pylint: disable=line-too-long
+        question_models.QuestionSkillLinkModel.
+        get_question_skill_links_by_skill_ids(
             question_count, skill_ids, start_cursor))
 
     # Deduplicate question_ids and group skill_descriptions that are linked to
@@ -503,6 +526,8 @@ def apply_change_list(question_id, change_list):
         Question. The resulting question domain object.
     """
     question = get_question_by_id(question_id)
+    question_property_inapplicable_misconception_ids = (
+        question_domain.QUESTION_PROPERTY_INAPPLICABLE_MISCONCEPTION_IDS)
     try:
         for change in change_list:
             if change.cmd == question_domain.CMD_UPDATE_QUESTION_PROPERTY:
@@ -517,6 +542,10 @@ def apply_change_list(question_id, change_list):
                 elif (change.property_name ==
                       question_domain.QUESTION_PROPERTY_LINKED_SKILL_IDS):
                     question.update_linked_skill_ids(change.new_value)
+                elif (change.property_name ==
+                      question_property_inapplicable_misconception_ids):
+                    question.update_inapplicable_misconception_ids(
+                        change.new_value)
 
         return question
 
@@ -542,7 +571,7 @@ def _save_question(committer_id, question, change_list, commit_message):
             question.
 
     Raises:
-        Exception: Received an invalid change list.
+        Exception. Received an invalid change list.
     """
     if not change_list:
         raise Exception(
@@ -556,6 +585,8 @@ def _save_question(committer_id, question, change_list, commit_message):
     question_model.question_state_data_schema_version = (
         question.question_state_data_schema_version)
     question_model.linked_skill_ids = question.linked_skill_ids
+    question_model.inapplicable_misconception_ids = (
+        question.inapplicable_misconception_ids)
     change_dicts = [change.to_dict() for change in change_list]
     question_model.commit(committer_id, commit_message, change_dicts)
     question.version += 1
@@ -576,7 +607,7 @@ def update_question(
             question.
 
     Raises:
-        ValueError: No commit message was provided.
+        ValueError. No commit message was provided.
     """
     if not commit_message:
         raise ValueError(
@@ -610,8 +641,15 @@ def compute_summary_of_question(question):
         QuestionSummary. The computed summary for the given question.
     """
     question_content = question.question_state_data.content.html
+    answer_groups = question.question_state_data.interaction.answer_groups
+    misconception_ids = [
+        answer_group.to_dict()['tagged_skill_misconception_id']
+        for answer_group in answer_groups
+        if answer_group.to_dict()['tagged_skill_misconception_id']]
+    misconception_ids.extend(question.inapplicable_misconception_ids)
+    interaction_id = question.question_state_data.interaction.id
     question_summary = question_domain.QuestionSummary(
-        question.id, question_content,
+        question.id, question_content, misconception_ids, interaction_id,
         question.created_on, question.last_updated)
     return question_summary
 
@@ -621,14 +659,16 @@ def save_question_summary(question_summary):
     entity in the datastore.
 
     Args:
-        question_summary: The question summary object to be saved in the
-            datastore.
+        question_summary: QuestionSummaryModel. The question summary object to
+            be saved in the datastore.
     """
     question_summary_model = question_models.QuestionSummaryModel(
         id=question_summary.id,
         question_model_last_updated=question_summary.last_updated,
         question_model_created_on=question_summary.created_on,
-        question_content=question_summary.question_content
+        question_content=question_summary.question_content,
+        misconception_ids=question_summary.misconception_ids,
+        interaction_id=question_summary.interaction_id
     )
 
     question_summary_model.put()
@@ -639,14 +679,18 @@ def get_question_summary_from_model(question_summary_model):
     question summary model.
 
     Args:
-        question_summary_model: QuestionSummaryModel.
+        question_summary_model: QuestionSummaryModel. The QuestionSummary model
+            object to fetch corresponding QuestionSummary domain object.
 
     Returns:
-        QuestionSummary.
+        QuestionSummary. The domain object corresponding to the given question
+        summary model.
     """
     return question_domain.QuestionSummary(
         question_summary_model.id,
         question_summary_model.question_content,
+        question_summary_model.misconception_ids,
+        question_summary_model.interaction_id,
         question_summary_model.question_model_created_on,
         question_summary_model.question_model_last_updated
     )

@@ -24,11 +24,8 @@ import subprocess
 import sys
 
 from core.tests import test_utils
-import python_utils
 
-from . import codeowner_linter
 from . import pre_commit_linter
-from . import third_party_typings_linter
 from .. import concurrent_task_utils
 from .. import install_third_party_libs
 
@@ -83,41 +80,15 @@ def all_checks_passed(linter_stdout):
     return 'All Checks Passed.' in linter_stdout
 
 
-class LintTests(test_utils.GenericTestBase):
-    """General class for all linter function tests."""
-
-    def setUp(self):
-        super(LintTests, self).setUp()
-        self.linter_stdout = []
-
-        def mock_print(*args):
-            """Mock for python_utils.PRINT. Append the values to print to
-            linter_stdout list.
-
-            Args:
-                *args: str. Variable length argument list of values to print in
-                    the same line of output.
-            """
-            self.linter_stdout.append(
-                ' '.join(python_utils.UNICODE(arg) for arg in args))
-
-        self.print_swap = self.swap(python_utils, 'PRINT', mock_print)
-        self.sys_swap = self.swap(sys, 'exit', mock_exit)
-        self.install_swap = self.swap_with_checks(
-            install_third_party_libs, 'main',
-            mock_install_third_party_libs_main)
-
-
-class PreCommitLinterTests(LintTests):
+class PreCommitLinterTests(test_utils.LinterTestBase):
     """Tests for methods in pre_commit_linter module."""
 
     def setUp(self):
         super(PreCommitLinterTests, self).setUp()
-        self.check_codeowner_swap = self.swap(
-            codeowner_linter, 'check_codeowner_file', mock_check_codeowner_file)
-        self.check_type_defs_swap = self.swap(
-            third_party_typings_linter, 'check_third_party_libs_type_defs',
-            mock_check_third_party_libs_type_defs)
+        self.sys_swap = self.swap(sys, 'exit', mock_exit)
+        self.install_swap = self.swap_with_checks(
+            install_third_party_libs, 'main',
+            mock_install_third_party_libs_main)
 
     def test_main_with_no_files(self):
         def mock_get_all_filepaths(unused_path, unused_files):
@@ -126,8 +97,8 @@ class PreCommitLinterTests(LintTests):
         all_filepath_swap = self.swap(
             pre_commit_linter, '_get_all_filepaths', mock_get_all_filepaths)
 
-        with self.print_swap, self.sys_swap, self.check_codeowner_swap:
-            with self.install_swap, self.check_type_defs_swap:
+        with self.print_swap, self.sys_swap:
+            with self.install_swap:
                 with all_filepath_swap:
                     pre_commit_linter.main()
         self.assert_same_list_elements(
@@ -141,16 +112,16 @@ class PreCommitLinterTests(LintTests):
             pre_commit_linter, '_get_changed_filepaths',
             mock_get_changed_filepaths)
 
-        with self.print_swap, self.sys_swap, self.check_codeowner_swap:
-            with self.install_swap, self.check_type_defs_swap:
+        with self.print_swap, self.sys_swap:
+            with self.install_swap:
                 with get_changed_filepaths_swap:
                     pre_commit_linter.main()
         self.assert_same_list_elements(
             ['No files to check'], self.linter_stdout)
 
     def test_main_with_files_arg(self):
-        with self.print_swap, self.sys_swap, self.check_codeowner_swap:
-            with self.install_swap, self.check_type_defs_swap:
+        with self.print_swap, self.sys_swap:
+            with self.install_swap:
                 pre_commit_linter.main(args=['--files=%s' % PYLINTRC_FILEPATH])
         self.assertTrue(all_checks_passed(self.linter_stdout))
 
@@ -158,37 +129,33 @@ class PreCommitLinterTests(LintTests):
         all_errors_swap = self.swap(
             concurrent_task_utils, 'ALL_ERRORS', ['This is an error.'])
 
-        with self.print_swap, self.sys_swap, self.check_codeowner_swap:
-            with self.install_swap, self.check_type_defs_swap, all_errors_swap:
+        with self.print_swap, self.sys_swap:
+            with self.install_swap, all_errors_swap:
                 pre_commit_linter.main(args=['--path=%s' % VALID_PY_FILEPATH])
-        self.assertFalse(all_checks_passed(self.linter_stdout))
         self.assert_same_list_elements(
             ['This is an error.'], self.linter_stdout)
 
     def test_main_with_path_arg(self):
-        with self.print_swap, self.sys_swap, self.check_codeowner_swap:
-            with self.install_swap, self.check_type_defs_swap:
+        with self.print_swap, self.sys_swap:
+            with self.install_swap:
                 pre_commit_linter.main(
                     args=['--path=%s' % INVALID_CSS_FILEPATH])
         self.assertFalse(all_checks_passed(self.linter_stdout))
         self.assert_same_list_elements([
             '19:16',
-            'Unexpected whitespace before \":\"   declaration-colon-space-'
-            'before'], self.linter_stdout)
+            'Unexpected whitespace before \":\"'], self.linter_stdout)
 
     def test_main_with_invalid_filepath_with_path_arg(self):
-        with self.print_swap, self.assertRaises(SystemExit) as e:
+        with self.print_swap, self.assertRaisesRegexp(SystemExit, '1'):
             pre_commit_linter.main(args=['--path=invalid_file.py'])
         self.assert_same_list_elements(
             ['Could not locate file or directory'], self.linter_stdout)
-        self.assertEqual(e.exception.code, 1)
 
     def test_main_with_invalid_filepath_with_file_arg(self):
-        with self.print_swap, self.assertRaises(SystemExit) as e:
+        with self.print_swap, self.assertRaisesRegexp(SystemExit, '1'):
             pre_commit_linter.main(args=['--files=invalid_file.py'])
         self.assert_same_list_elements(
             ['The following file(s) do not exist'], self.linter_stdout)
-        self.assertEqual(e.exception.code, 1)
 
     def test_path_arg_with_directory_name(self):
         def mock_get_all_files_in_directory(
@@ -199,22 +166,22 @@ class PreCommitLinterTests(LintTests):
             pre_commit_linter, '_get_all_files_in_directory',
             mock_get_all_files_in_directory)
 
-        with self.print_swap, self.sys_swap, self.check_codeowner_swap:
-            with self.install_swap, self.check_type_defs_swap:
+        with self.print_swap, self.sys_swap:
+            with self.install_swap:
                 with get_all_files_swap:
                     pre_commit_linter.main(args=['--path=scripts/linters/'])
         self.assertTrue(all_checks_passed(self.linter_stdout))
 
     def test_main_with_only_check_file_extensions_arg(self):
-        with self.print_swap, self.sys_swap, self.check_codeowner_swap:
-            with self.install_swap, self.check_type_defs_swap:
+        with self.print_swap, self.sys_swap:
+            with self.install_swap:
                 pre_commit_linter.main(
                     args=['--path=%s' % VALID_TS_FILEPATH,
                           '--only-check-file-extensions=ts'])
         self.assertTrue(all_checks_passed(self.linter_stdout))
 
     def test_main_with_only_check_file_extensions_arg_with_js_ts_options(self):
-        with self.print_swap, self.assertRaises(SystemExit) as e:
+        with self.print_swap, self.assertRaisesRegexp(SystemExit, '1'):
             pre_commit_linter.main(
                 args=['--path=%s' % VALID_TS_FILEPATH,
                       '--only-check-file-extensions', 'ts', 'js'])
@@ -223,11 +190,10 @@ class PreCommitLinterTests(LintTests):
             'separate linters for JS and TS files. If both these options '
             'are used together, then the JS/TS linter will be run twice.'
             ], self.linter_stdout)
-        self.assertEqual(e.exception.code, 1)
 
     def test_get_all_files_in_directory(self):
-        with self.print_swap, self.sys_swap, self.check_codeowner_swap:
-            with self.install_swap, self.check_type_defs_swap:
+        with self.print_swap, self.sys_swap:
+            with self.install_swap:
                 pre_commit_linter.main(
                     args=['--path=scripts/linters/',
                           '--only-check-file-extensions=ts'])
@@ -239,6 +205,6 @@ class PreCommitLinterTests(LintTests):
         subprocess_swap = self.swap(
             subprocess, 'check_output', mock_check_output)
 
-        with self.print_swap, self.sys_swap, self.check_codeowner_swap:
-            with self.install_swap, self.check_type_defs_swap, subprocess_swap:
+        with self.print_swap, self.sys_swap:
+            with self.install_swap, subprocess_swap:
                 pre_commit_linter.main()

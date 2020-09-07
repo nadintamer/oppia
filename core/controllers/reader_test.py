@@ -267,9 +267,7 @@ class ExplorationPretestsUnitTest(test_utils.GenericTestBase):
             description='A new topic', canonical_story_ids=[],
             additional_story_ids=[], uncategorized_skill_ids=[],
             subtopics=[], next_subtopic_id=0)
-        self.save_new_story(
-            story_id, 'user', 'Title', 'Description', 'Notes', topic_id
-        )
+        self.save_new_story(story_id, 'user', topic_id)
         topic_services.add_canonical_story('user', topic_id, story_id)
 
         changelist = [
@@ -319,19 +317,20 @@ class ExplorationPretestsUnitTest(test_utils.GenericTestBase):
         # Call the handler.
         with self.swap(feconf, 'NUM_PRETEST_QUESTIONS', 1):
             json_response_1 = self.get_json(
-                '%s/%s?story_id=%s' % (
-                    feconf.EXPLORATION_PRETESTS_URL_PREFIX, exp_id, story_id))
-        self.assertTrue(json_response_1['pretest_question_dicts'][0]['id'] in
-                        [question_id, question_id_2])
+                '%s/%s?story_url_fragment=title' % (
+                    feconf.EXPLORATION_PRETESTS_URL_PREFIX, exp_id))
+        self.assertTrue(
+            json_response_1['pretest_question_dicts'][0]['id'] in
+            [question_id, question_id_2])
 
         self.get_json(
-            '%s/%s?story_id=%s' % (
-                feconf.EXPLORATION_PRETESTS_URL_PREFIX, exp_id_2, story_id),
+            '%s/%s?story_url_fragment=title' % (
+                feconf.EXPLORATION_PRETESTS_URL_PREFIX, exp_id_2),
             expected_status_int=400)
 
         self.get_json(
-            '%s/%s?story_id=%s' % (
-                feconf.EXPLORATION_PRETESTS_URL_PREFIX, exp_id_2, 'story'),
+            '%s/%s?story_url_fragment=invalid-story' % (
+                feconf.EXPLORATION_PRETESTS_URL_PREFIX, exp_id_2),
             expected_status_int=400)
 
 
@@ -434,8 +433,9 @@ class QuestionsUnitTest(test_utils.GenericTestBase):
                 feconf.MAX_QUESTIONS_FETCHABLE_AT_ONE_TIME),
             skill_ids_for_url, 'true')
         json_response = self.get_json(url)
-        self.assertEqual(len(json_response['question_dicts']),
-                         feconf.MAX_QUESTIONS_FETCHABLE_AT_ONE_TIME)
+        self.assertEqual(
+            len(json_response['question_dicts']),
+            feconf.MAX_QUESTIONS_FETCHABLE_AT_ONE_TIME)
 
     def test_invalid_skill_id_returns_no_questions(self):
         # Call the handler.
@@ -616,7 +616,7 @@ class RatingsIntegrationTests(test_utils.GenericTestBase):
         self.logout()
 
 
-class RecommendationsHandlerTests(test_utils.GenericTestBase):
+class RecommendationsHandlerTests(test_utils.EmailTestBase):
     """Backend integration tests for recommended explorations for after an
     exploration is completed.
     """
@@ -689,7 +689,8 @@ class RecommendationsHandlerTests(test_utils.GenericTestBase):
         """Sets the recommendations in the exploration corresponding to the
         given exploration id.
         """
-        recommendations_services.set_recommendations(exp_id, recommended_ids)
+        recommendations_services.set_exploration_recommendations(
+            exp_id, recommended_ids)
 
     def _complete_exploration_in_collection(self, exp_id):
         """Completes the exploration within the collection. Records that the
@@ -1073,7 +1074,7 @@ class RecommendationsHandlerTests(test_utils.GenericTestBase):
         )
 
 
-class FlagExplorationHandlerTests(test_utils.GenericTestBase):
+class FlagExplorationHandlerTests(test_utils.EmailTestBase):
     """Backend integration tests for flagging an exploration."""
 
     EXP_ID = '0'
@@ -1156,7 +1157,8 @@ class FlagExplorationHandlerTests(test_utils.GenericTestBase):
         with self.can_send_emails_ctx:
             self.process_and_flush_pending_tasks()
 
-            messages = self.mail_stub.get_sent_messages(to=self.MODERATOR_EMAIL)
+            messages = self._get_sent_email_messages(
+                self.MODERATOR_EMAIL)
             self.assertEqual(len(messages), 1)
             self.assertEqual(
                 messages[0].html.decode(),

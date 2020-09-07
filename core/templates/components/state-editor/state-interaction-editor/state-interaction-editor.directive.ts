@@ -33,11 +33,16 @@ require(
   'pages/exploration-editor-page/editor-tab/services/' +
   'interaction-details-cache.service.ts');
 require(
+  'pages/exploration-editor-page/editor-tab/services/responses.service.ts');
+require(
   'components/state-editor/state-editor-properties-services/' +
   'state-content.service.ts');
 require(
   'components/state-editor/state-editor-properties-services/' +
   'state-customization-args.service.ts');
+require(
+  'components/state-editor/state-editor-properties-services/' +
+  'state-next-content-id-index.service');
 require(
   'components/state-editor/state-editor-properties-services/' +
   'state-editor.service.ts');
@@ -54,6 +59,9 @@ require('services/alerts.service.ts');
 require('services/editability.service.ts');
 require('services/exploration-html-formatter.service.ts');
 require('services/html-escaper.service.ts');
+require('services/contextual/window-dimensions.service.ts');
+
+import { Subscription } from 'rxjs';
 
 angular.module('oppia').directive('stateInteractionEditor', [
   'UrlInterpolationService', function(UrlInterpolationService) {
@@ -69,31 +77,32 @@ angular.module('oppia').directive('stateInteractionEditor', [
       scope: {
         onSaveInteractionCustomizationArgs: '=',
         onSaveInteractionId: '=',
+        onSaveNextContentIdIndex: '=',
         onSaveSolution: '=',
         onSaveStateContent: '=',
-        recomputeGraph: '='
+        recomputeGraph: '=',
+        showMarkAllAudioAsNeedingUpdateModalIfRequired: '<'
       },
       templateUrl: UrlInterpolationService.getDirectiveTemplateUrl(
         '/components/state-editor/state-interaction-editor/' +
         'state-interaction-editor.directive.html'),
       controller: [
-        '$scope', '$http', '$rootScope', '$uibModal', '$injector', '$filter',
-        'AlertsService', 'HtmlEscaperService', 'StateEditorService',
-        'INTERACTION_SPECS', 'StateInteractionIdService',
-        'StateCustomizationArgsService', 'EditabilityService',
-        'InteractionDetailsCacheService', 'UrlInterpolationService',
-        'ExplorationHtmlFormatterService', 'SubtitledHtmlObjectFactory',
-        'StateSolutionService', 'StateHintsService',
-        'StateContentService', function(
-            $scope, $http, $rootScope, $uibModal, $injector, $filter,
-            AlertsService, HtmlEscaperService, StateEditorService,
-            INTERACTION_SPECS, StateInteractionIdService,
-            StateCustomizationArgsService, EditabilityService,
-            InteractionDetailsCacheService, UrlInterpolationService,
-            ExplorationHtmlFormatterService, SubtitledHtmlObjectFactory,
-            StateSolutionService, StateHintsService,
-            StateContentService) {
+        '$scope', '$uibModal', 'AlertsService', 'EditabilityService',
+        'ExplorationHtmlFormatterService', 'InteractionDetailsCacheService',
+        'ResponsesService', 'StateContentService',
+        'StateCustomizationArgsService', 'StateEditorService',
+        'StateInteractionIdService', 'StateNextContentIdIndexService',
+        'StateSolutionService', 'UrlInterpolationService',
+        'WindowDimensionsService', 'INTERACTION_SPECS', function(
+            $scope, $uibModal, AlertsService, EditabilityService,
+            ExplorationHtmlFormatterService, InteractionDetailsCacheService,
+            ResponsesService, StateContentService,
+            StateCustomizationArgsService, StateEditorService,
+            StateInteractionIdService, StateNextContentIdIndexService,
+            StateSolutionService, UrlInterpolationService,
+            WindowDimensionsService, INTERACTION_SPECS) {
           var ctrl = this;
+          ctrl.directiveSubscriptions = new Subscription();
           var DEFAULT_TERMINAL_STATE_CONTENT =
             'Congratulations, you have finished!';
 
@@ -136,8 +145,7 @@ angular.module('oppia').directive('stateInteractionEditor', [
           };
 
           var _updateAnswerChoices = function() {
-            $rootScope.$broadcast(
-              'updateAnswerChoices',
+            StateEditorService.onUpdateAnswerChoices.emit(
               StateEditorService.getAnswerChoices(
                 $scope.interactionId,
                 StateCustomizationArgsService.savedMemento));
@@ -161,6 +169,15 @@ angular.module('oppia').directive('stateInteractionEditor', [
           };
 
           $scope.onCustomizationModalSavePostHook = function() {
+            let nextContentIdIndexHasChanged = (
+              StateNextContentIdIndexService.displayed !==
+              StateNextContentIdIndexService.savedMemento);
+            if (nextContentIdIndexHasChanged) {
+              StateNextContentIdIndexService.saveDisplayedValue();
+              $scope.onSaveNextContentIdIndex(
+                StateNextContentIdIndexService.displayed);
+            }
+
             var hasInteractionIdChanged = (
               StateInteractionIdService.displayed !==
               StateInteractionIdService.savedMemento);
@@ -185,18 +202,18 @@ angular.module('oppia').directive('stateInteractionEditor', [
             // This must be called here so that the rules are updated before the
             // state graph is recomputed.
             if (hasInteractionIdChanged) {
-              $rootScope.$broadcast(
-                'onInteractionIdChanged',
-                StateInteractionIdService.savedMemento);
+              StateInteractionIdService.onInteractionIdChanged.emit(
+                StateInteractionIdService.savedMemento
+              );
             }
 
             $scope.recomputeGraph();
             _updateInteractionPreview();
-            $rootScope.$broadcast(
-              'handleCustomArgsUpdate',
+            StateEditorService.onHandleCustomArgsUpdate.emit(
               StateEditorService.getAnswerChoices(
                 $scope.interactionId,
-                StateCustomizationArgsService.savedMemento));
+                StateCustomizationArgsService.savedMemento)
+            );
           };
 
           $scope.openInteractionCustomizerModal = function() {
@@ -207,12 +224,18 @@ angular.module('oppia').directive('stateInteractionEditor', [
                 templateUrl: UrlInterpolationService.getDirectiveTemplateUrl(
                   '/pages/exploration-editor-page/editor-tab/templates/' +
                   'modal-templates/customize-interaction-modal.template.html'),
+                resolve: {
+                  showMarkAllAudioAsNeedingUpdateModalIfRequired: () =>
+                    $scope.showMarkAllAudioAsNeedingUpdateModalIfRequired
+                },
                 backdrop: true,
+                windowClass: 'customize-interaction-modal',
                 controller: 'CustomizeInteractionModalController'
               }).result.then(
                 $scope.onCustomizationModalSavePostHook, function() {
                   StateInteractionIdService.restoreFromMemento();
                   StateCustomizationArgsService.restoreFromMemento();
+                  StateNextContentIdIndexService.restoreFromMemento();
                 });
             }
           };
@@ -242,9 +265,9 @@ angular.module('oppia').directive('stateInteractionEditor', [
               StateSolutionService.saveDisplayedValue();
               $scope.onSaveSolution(StateSolutionService.displayed);
 
-              $rootScope.$broadcast(
-                'onInteractionIdChanged',
-                StateInteractionIdService.savedMemento);
+              StateInteractionIdService.onInteractionIdChanged.emit(
+                StateInteractionIdService.savedMemento
+              );
               $scope.recomputeGraph();
               _updateInteractionPreview();
               _updateAnswerChoices();
@@ -253,39 +276,52 @@ angular.module('oppia').directive('stateInteractionEditor', [
             });
           };
 
+          $scope.toggleInteractionEditor = function() {
+            $scope.interactionEditorIsShown = !$scope.interactionEditorIsShown;
+          };
+
           ctrl.$onInit = function() {
             $scope.EditabilityService = EditabilityService;
-
+            $scope.windowIsNarrow = WindowDimensionsService.isWindowNarrow();
+            $scope.interactionEditorIsShown = (
+              !WindowDimensionsService.isWindowNarrow());
             $scope.StateInteractionIdService = StateInteractionIdService;
             $scope.hasLoaded = false;
             $scope.customizationModalReopened = false;
-            $scope.$on('stateEditorInitialized', function(evt, stateData) {
-              if (stateData === undefined || $.isEmptyObject(stateData)) {
-                throw new Error(
-                  'Expected stateData to be defined but ' +
-                  'received ' + stateData);
-              }
-              $scope.hasLoaded = false;
-              InteractionDetailsCacheService.reset();
-              $rootScope.$broadcast('initializeAnswerGroups', {
-                interactionId: stateData.interaction.id,
-                answerGroups: stateData.interaction.answerGroups,
-                defaultOutcome: stateData.interaction.defaultOutcome,
-                confirmedUnclassifiedAnswers: (
-                  stateData.interaction.confirmedUnclassifiedAnswers)
-              });
+            ctrl.directiveSubscriptions.add(
+              StateEditorService.onStateEditorInitialized.subscribe(
+                (stateData) => {
+                  if (stateData === undefined || $.isEmptyObject(stateData)) {
+                    throw new Error(
+                      'Expected stateData to be defined but ' +
+                      'received ' + stateData);
+                  }
+                  $scope.hasLoaded = false;
+                  InteractionDetailsCacheService.reset();
+                  ResponsesService.onInitializeAnswerGroups.emit({
+                    interactionId: stateData.interaction.id,
+                    answerGroups: stateData.interaction.answerGroups,
+                    defaultOutcome: stateData.interaction.defaultOutcome,
+                    confirmedUnclassifiedAnswers: (
+                      stateData.interaction.confirmedUnclassifiedAnswers)
+                  });
 
-              _updateInteractionPreview();
-              _updateAnswerChoices();
-              $scope.hasLoaded = true;
-            });
+                  _updateInteractionPreview();
+                  _updateAnswerChoices();
+                  $scope.hasLoaded = true;
+                }
+              )
+            );
 
             $scope.getStaticImageUrl = function(imagePath) {
               return UrlInterpolationService.getStaticImageUrl(imagePath);
             };
-
-            $rootScope.$broadcast('interactionEditorInitialized');
+            StateEditorService.onInteractionEditorInitialized.emit();
             StateEditorService.updateStateInteractionEditorInitialised();
+          };
+
+          ctrl.$onDestroy = function() {
+            ctrl.directiveSubscriptions.unsubscribe();
           };
         }
       ]

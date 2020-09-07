@@ -37,10 +37,10 @@ require('domain/editor/undo_redo/undo-redo.service.ts');
 require('domain/question/editable-question-backend-api.service.ts');
 require('domain/question/QuestionObjectFactory.ts');
 require('domain/skill/MisconceptionObjectFactory.ts');
+require('domain/skill/ShortSkillSummaryObjectFactory.ts');
 require('domain/skill/skill-backend-api.service.ts');
 require('domain/skill/skill-creation-backend-api.service.ts');
 require('domain/skill/SkillDifficultyObjectFactory.ts');
-require('domain/skill/SkillSummaryObjectFactory.ts');
 require('domain/utilities/url-interpolation.service.ts');
 require('filters/format-rte-preview.filter.ts');
 require('filters/string-utility-filters/truncate.filter.ts');
@@ -82,8 +82,6 @@ angular.module('oppia').factory('QuestionCreationService', [
     var skillId = null;
     var questionId = null;
     var questionStateData = null;
-    var questionIsBeingUpdated = null;
-    var newQuestionIsBeingCreated = null;
     var skillIdToRubricsObject = {};
     var misconceptionsBySkill = {};
     var groupedSkillSummaries = null;
@@ -130,7 +128,6 @@ angular.module('oppia').factory('QuestionCreationService', [
           groupedSkillSummaries.current.length;
       var allSkillSummaries = sortedSkillSummaries.map(
         function(summary) {
-          summary.isSelected = false;
           return summary;
         });
       $uibModal.open({
@@ -173,8 +170,6 @@ angular.module('oppia').factory('QuestionCreationService', [
           QuestionObjectFactory.createDefaultQuestion(newQuestionSkillIds);
       questionId = question.getId();
       questionStateData = question.getStateData();
-      questionIsBeingUpdated = false;
-      newQuestionIsBeingCreated = true;
       openQuestionEditor(newQuestionSkillDifficulties[0]);
     };
 
@@ -214,7 +209,6 @@ angular.module('oppia').factory('QuestionCreationService', [
       var newQuestionIsBeingCreated = true;
 
       QuestionUndoRedoService.clearChanges();
-      var editorIsOpen = true;
       var selectedSkillId = SkillEditorStateService.getSkill().getId();
       $location.hash(questionId);
       var skillIdToNameMapping = (
@@ -234,6 +228,7 @@ angular.module('oppia').factory('QuestionCreationService', [
         keyboard: false,
         resolve: {
           associatedSkillSummaries: () => [],
+          untriagedSkillSummaries: () => [],
           canEditQuestion: () => canEditQuestion,
           categorizedSkills: () => [],
           groupedSkillSummaries: () => groupedSkillSummaries,
@@ -248,7 +243,6 @@ angular.module('oppia').factory('QuestionCreationService', [
         controller: 'QuestionEditorModalController',
       }).result.then(function() {
         $location.hash(null);
-        editorIsOpen = false;
         saveAndPublishQuestion();
       });
     };

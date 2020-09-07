@@ -26,7 +26,7 @@ import { UrlInterpolationService } from
   'domain/utilities/url-interpolation.service';
 import { CollectionRights, CollectionRightsObjectFactory } from
   'domain/collection/CollectionRightsObjectFactory';
-import { ICollectionRightsBackendDict } from
+import { CollectionRightsBackendDict } from
   'domain/collection/CollectionRightsObjectFactory';
 
 @Injectable({
@@ -41,16 +41,17 @@ export class CollectionRightsBackendApiService {
     private http: HttpClient,
     private urlInterpolationService: UrlInterpolationService) { }
 
-  private _fetchCollectionRights(collectionId: string,
-      successCallback: (value?: CollectionRights) => void,
-      errorCallback: (reason?: any) => void): void {
+  private _fetchCollectionRights(
+      collectionId: string,
+      successCallback: (value: CollectionRights) => void,
+      errorCallback: (reason: string) => void): void {
     let collectionRightsUrl = this.urlInterpolationService
       .interpolateUrl(
         CollectionEditorPageConstants.COLLECTION_RIGHTS_URL_TEMPLATE, {
           collection_id: collectionId
         });
 
-    this.http.get<ICollectionRightsBackendDict>(collectionRightsUrl).toPromise()
+    this.http.get<CollectionRightsBackendDict>(collectionRightsUrl).toPromise()
       .then(response => {
         if (successCallback) {
           successCallback(
@@ -59,18 +60,19 @@ export class CollectionRightsBackendApiService {
           );
         }
       },
-      (error) => {
+      errorResponse => {
         if (errorCallback) {
-          errorCallback(error.statusText);
+          errorCallback(errorResponse.error.error);
         }
       });
   }
 
-  private _setCollectionStatus(collectionId: string,
+  private _setCollectionStatus(
+      collectionId: string,
       collectionVersion: number,
       isPublic: boolean,
-      successCallback: (value?: Object | PromiseLike<Object>) => void,
-      errorCallback: (reason?: any) => void): void {
+      successCallback: (value: CollectionRights) => void,
+      errorCallback: (reason: string) => void): void {
     let collectionPublishUrl = this.urlInterpolationService
       .interpolateUrl('/collection_editor_handler/publish/<collection_id>', {
         collection_id: collectionId
@@ -88,20 +90,21 @@ export class CollectionRightsBackendApiService {
     let requestUrl = (
       isPublic ? collectionPublishUrl : collectionUnpublishUrl);
 
-    this.http.put(requestUrl, putParams).toPromise().then((response: any) => {
-      let collectionRights =
-        this.collectionRightsObjectFactory.create(response);
-      this.collectionRightsCache[collectionId] = collectionRights;
+    this.http.put<CollectionRightsBackendDict>(requestUrl, putParams)
+      .toPromise().then(response => {
+        let collectionRights =
+          this.collectionRightsObjectFactory.create(response);
+        this.collectionRightsCache[collectionId] = collectionRights;
 
-      if (successCallback) {
-        successCallback(collectionRights);
-      }
-    },
-    (error) => {
-      if (errorCallback) {
-        errorCallback(error);
-      }
-    });
+        if (successCallback) {
+          successCallback(collectionRights);
+        }
+      },
+      errorResponse => {
+        if (errorCallback) {
+          errorCallback(errorResponse.error.error);
+        }
+      });
   }
 
   private _isCached(collectionId: string): boolean {
@@ -133,8 +136,8 @@ export class CollectionRightsBackendApiService {
           resolve(this.collectionRightsCache[collectionId]);
         }
       } else {
-        this._fetchCollectionRights(collectionId,
-          (collectionRights) => {
+        this._fetchCollectionRights(
+          collectionId, (collectionRights) => {
             // Save the fetched collection rights to avoid future fetches.
             this.collectionRightsCache[collectionId] = collectionRights;
             if (resolve) {
@@ -158,7 +161,8 @@ export class CollectionRightsBackendApiService {
    * Replaces the current collection rights in the cache given by the
    * specified collection ID with a new collection rights object.
    */
-  cacheCollectionRights(collectionId: string,
+  cacheCollectionRights(
+      collectionId: string,
       collectionRights: CollectionRights): void {
     this.collectionRightsCache[collectionId] = collectionRights;
   }
@@ -166,7 +170,8 @@ export class CollectionRightsBackendApiService {
    * Updates a collection's rights to be have public learner access, given
    * its ID and version.
    */
-  setCollectionPublic(collectionId: string,
+  setCollectionPublic(
+      collectionId: string,
       collectionVersion: number): Promise<CollectionRights> {
     return new Promise((resolve, reject) => {
       this._setCollectionStatus(
@@ -178,7 +183,8 @@ export class CollectionRightsBackendApiService {
    * Updates a collection's rights to be have private learner access,
    * given its ID and version.
    */
-  setCollectionPrivate(collectionId: string,
+  setCollectionPrivate(
+      collectionId: string,
       collectionVersion: number): Promise<CollectionRights> {
     return new Promise((resolve, reject) => {
       this._setCollectionStatus(
@@ -187,6 +193,5 @@ export class CollectionRightsBackendApiService {
   }
 }
 
-angular.module('oppia')
-  .factory('CollectionRightsBackendApiService',
-    downgradeInjectable(CollectionRightsBackendApiService));
+angular.module('oppia').factory('CollectionRightsBackendApiService',
+  downgradeInjectable(CollectionRightsBackendApiService));

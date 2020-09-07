@@ -22,10 +22,11 @@ from __future__ import unicode_literals  # pylint: disable=import-only-modules
 import json
 
 from core.domain import fs_domain
+from core.domain import image_services
 from core.platform import models
 import feconf
 
-gae_image_services = models.Registry.import_gae_image_services()
+(suggestion_models,) = models.Registry.import_models([models.NAMES.suggestion])
 
 
 def save_original_and_compressed_versions_of_image(
@@ -61,9 +62,9 @@ def save_original_and_compressed_versions_of_image(
         entity_type, entity_id))
 
     if image_is_compressible:
-        compressed_image_content = gae_image_services.compress_image(
+        compressed_image_content = image_services.compress_image(
             original_image_content, 0.8)
-        micro_image_content = gae_image_services.compress_image(
+        micro_image_content = image_services.compress_image(
             original_image_content, 0.7)
     else:
         compressed_image_content = original_image_content
@@ -150,3 +151,36 @@ def get_entity_file_system_class():
         class. GcsFileSystem class.
     """
     return fs_domain.GcsFileSystem
+
+
+def copy_images(
+        source_entity_type, source_entity_id, destination_entity_type,
+        destination_entity_id, filenames):
+    """Copy images from source to destination.
+
+    Args:
+        source_entity_type: str. The entity type of the source.
+        source_entity_id: str. The type of the source entity.
+        destination_entity_id: str. The id of the destination entity.
+        destination_entity_type: str. The entity type of the destination.
+        filenames: list(str). The list of filenames to copy.
+    """
+    file_system_class = get_entity_file_system_class()
+    source_fs = fs_domain.AbstractFileSystem(file_system_class(
+        source_entity_type, source_entity_id))
+    destination_fs = fs_domain.AbstractFileSystem(file_system_class(
+        destination_entity_type, destination_entity_id))
+    for filename in filenames:
+        filename_wo_filetype = filename[:filename.rfind('.')]
+        filetype = filename[filename.rfind('.') + 1:]
+        compressed_image_filename = '%s_compressed.%s' % (
+            filename_wo_filetype, filetype)
+        micro_image_filename = '%s_micro.%s' % (
+            filename_wo_filetype, filetype)
+        destination_fs.copy(
+            source_fs.impl.assets_path, ('image/%s' % filename))
+        destination_fs.copy(
+            source_fs.impl.assets_path,
+            ('image/%s' % compressed_image_filename))
+        destination_fs.copy(
+            source_fs.impl.assets_path, ('image/%s' % micro_image_filename))

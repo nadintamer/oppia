@@ -27,19 +27,26 @@ from __future__ import unicode_literals  # pylint: disable=import-only-modules
 import collections
 import copy
 import functools
+import json
 import re
 import string
 
 from constants import constants
 from core.domain import change_domain
+from core.domain import customization_args_util
+from core.domain import expression_parser
 from core.domain import html_validation_service
 from core.domain import interaction_registry
 from core.domain import param_domain
 from core.domain import state_domain
 from core.platform import models
+from extensions import domain
 import feconf
 import python_utils
+import schema_utils
 import utils
+
+from pylatexenc import latex2text
 
 (exp_models,) = models.Registry.import_models([models.NAMES.exploration])
 
@@ -55,6 +62,7 @@ STATE_PROPERTY_SOLICIT_ANSWER_DETAILS = 'solicit_answer_details'
 STATE_PROPERTY_RECORDED_VOICEOVERS = 'recorded_voiceovers'
 STATE_PROPERTY_WRITTEN_TRANSLATIONS = 'written_translations'
 STATE_PROPERTY_INTERACTION_ID = 'widget_id'
+STATE_PROPERTY_NEXT_CONTENT_ID_INDEX = 'next_content_id_index'
 STATE_PROPERTY_INTERACTION_CUST_ARGS = 'widget_customization_args'
 STATE_PROPERTY_INTERACTION_ANSWER_GROUPS = 'answer_groups'
 STATE_PROPERTY_INTERACTION_DEFAULT_OUTCOME = 'default_outcome'
@@ -107,6 +115,85 @@ STATISTICAL_CLASSIFICATION = 'statistical_classifier'
 # rather than belonging to a specific answer group.
 DEFAULT_OUTCOME_CLASSIFICATION = 'default_outcome'
 
+TYPE_INVALID_EXPRESSION = 'Invalid'
+TYPE_VALID_ALGEBRAIC_EXPRESSION = 'AlgebraicExpressionInput'
+TYPE_VALID_NUMERIC_EXPRESSION = 'NumericExpressionInput'
+TYPE_VALID_MATH_EQUATION = 'MathEquationInput'
+
+
+def clean_math_expression(math_expression):
+    """Cleans a given math expression and formats it so that it is compatible
+    with the new interactions' validators.
+
+    Args:
+        math_expression: str. The string representing the math expression.
+
+    Returns:
+        str. The correctly formatted string representing the math expression.
+    """
+    unicode_to_text = {
+        u'\u221a': 'sqrt',
+        u'\xb7': '*',
+        u'\u03b1': 'alpha',
+        u'\u03b2': 'beta',
+        u'\u03b3': 'gamma',
+        u'\u03b4': 'delta',
+        u'\u03b5': 'epsilon',
+        u'\u03b6': 'zeta',
+        u'\u03b7': 'eta',
+        u'\u03b8': 'theta',
+        u'\u03b9': 'iota',
+        u'\u03ba': 'kappa',
+        u'\u03bb': 'lambda',
+        u'\u03bc': 'mu',
+        u'\u03bd': 'nu',
+        u'\u03be': 'xi',
+        u'\u03c0': 'pi',
+        u'\u03c1': 'rho',
+        u'\u03c3': 'sigma',
+        u'\u03c4': 'tau',
+        u'\u03c5': 'upsilon',
+        u'\u03c6': 'phi',
+        u'\u03c7': 'chi',
+        u'\u03c8': 'psi',
+        u'\u03c9': 'omega',
+    }
+    inverse_trig_fns_mapping = {
+        'asin': 'arcsin',
+        'acos': 'arccos',
+        'atan': 'arctan'
+    }
+    trig_fns = ['sin', 'cos', 'tan', 'csc', 'sec', 'cot']
+
+    # Shifting powers in trig functions to the end.
+    # For eg. 'sin^2(x)' -> '(sin(x))^2'.
+    for trig_fn in trig_fns:
+        math_expression = re.sub(
+            r'%s(\^\d)\((.)\)' % trig_fn,
+            r'(%s(\2))\1' % trig_fn, math_expression)
+
+    # Adding parens to trig functions that don't have
+    # any. For eg. 'cosA' -> 'cos(A)'.
+    for trig_fn in trig_fns:
+        math_expression = re.sub(
+            r'%s(?!\()(.)' % trig_fn, r'%s(\1)' % trig_fn, math_expression)
+
+    # The pylatexenc lib outputs the unicode values of special characters like
+    # sqrt and pi, which is why they need to be replaced with their
+    # corresponding text values before performing validation. Other unicode
+    # characters will be left in the string as-is, and will be rejected by the
+    # expression parser.
+    for unicode_char, text in unicode_to_text.items():
+        math_expression = math_expression.replace(unicode_char, text)
+
+    # Replacing trig functions that have format which is
+    # incompatible with the validations.
+    for invalid_trig_fn, valid_trig_fn in inverse_trig_fns_mapping.items():
+        math_expression = math_expression.replace(
+            invalid_trig_fn, valid_trig_fn)
+
+    return math_expression
+
 
 class ExplorationChange(change_domain.BaseChange):
     """Domain object class for an exploration change.
@@ -145,6 +232,7 @@ class ExplorationChange(change_domain.BaseChange):
         STATE_PROPERTY_RECORDED_VOICEOVERS,
         STATE_PROPERTY_WRITTEN_TRANSLATIONS,
         STATE_PROPERTY_INTERACTION_ID,
+        STATE_PROPERTY_NEXT_CONTENT_ID_INDEX,
         STATE_PROPERTY_INTERACTION_CUST_ARGS,
         STATE_PROPERTY_INTERACTION_STICKY,
         STATE_PROPERTY_INTERACTION_HANDLERS,
@@ -166,44 +254,53 @@ class ExplorationChange(change_domain.BaseChange):
     ALLOWED_COMMANDS = [{
         'name': CMD_CREATE_NEW,
         'required_attribute_names': ['category', 'title'],
-        'optional_attribute_names': []
+        'optional_attribute_names': [],
+        'user_id_attribute_names': []
     }, {
         'name': CMD_ADD_STATE,
         'required_attribute_names': ['state_name'],
-        'optional_attribute_names': []
+        'optional_attribute_names': [],
+        'user_id_attribute_names': []
     }, {
         'name': CMD_DELETE_STATE,
         'required_attribute_names': ['state_name'],
-        'optional_attribute_names': []
+        'optional_attribute_names': [],
+        'user_id_attribute_names': []
     }, {
         'name': CMD_RENAME_STATE,
         'required_attribute_names': ['new_state_name', 'old_state_name'],
-        'optional_attribute_names': []
+        'optional_attribute_names': [],
+        'user_id_attribute_names': []
     }, {
         'name': CMD_ADD_TRANSLATION,
         'required_attribute_names': [
             'state_name', 'content_id', 'language_code', 'content_html',
             'translation_html'],
-        'optional_attribute_names': []
+        'optional_attribute_names': [],
+        'user_id_attribute_names': []
     }, {
         'name': CMD_EDIT_STATE_PROPERTY,
         'required_attribute_names': [
             'property_name', 'state_name', 'new_value'],
         'optional_attribute_names': ['old_value'],
+        'user_id_attribute_names': [],
         'allowed_values': {'property_name': STATE_PROPERTIES}
     }, {
         'name': CMD_EDIT_EXPLORATION_PROPERTY,
         'required_attribute_names': ['property_name', 'new_value'],
         'optional_attribute_names': ['old_value'],
+        'user_id_attribute_names': [],
         'allowed_values': {'property_name': EXPLORATION_PROPERTIES}
     }, {
         'name': CMD_MIGRATE_STATES_SCHEMA_TO_LATEST_VERSION,
         'required_attribute_names': ['from_version', 'to_version'],
-        'optional_attribute_names': []
+        'optional_attribute_names': [],
+        'user_id_attribute_names': []
     }, {
         'name': exp_models.ExplorationModel.CMD_REVERT_COMMIT,
         'required_attribute_names': ['version_number'],
-        'optional_attribute_names': []
+        'optional_attribute_names': [],
+        'user_id_attribute_names': []
     }]
 
 
@@ -304,7 +401,7 @@ class ExpVersionReference(python_utils.OBJECT):
         """Validates properties of the ExpVersionReference.
 
         Raises:
-            ValidationError: One or more attributes of the ExpVersionReference
+            ValidationError. One or more attributes of the ExpVersionReference
                 are invalid.
         """
         if not isinstance(self.exp_id, python_utils.BASESTRING):
@@ -541,6 +638,7 @@ class Exploration(python_utils.OBJECT):
 
             state.content = state_domain.SubtitledHtml(
                 sdict['content']['content_id'], sdict['content']['html'])
+            state.content.validate()
 
             state.param_changes = [param_domain.ParamChange(
                 pc['name'], pc['generator_id'], pc['customization_args']
@@ -548,9 +646,9 @@ class Exploration(python_utils.OBJECT):
 
             for pc in state.param_changes:
                 if pc.name not in exploration.param_specs:
-                    raise Exception('Parameter %s was used in a state but not '
-                                    'declared in the exploration param_specs.'
-                                    % pc.name)
+                    raise Exception(
+                        'Parameter %s was used in a state but not '
+                        'declared in the exploration param_specs.' % pc.name)
 
             idict = sdict['interaction']
             interaction_answer_groups = [
@@ -565,8 +663,15 @@ class Exploration(python_utils.OBJECT):
                 state_domain.Solution.from_dict(idict['id'], idict['solution'])
                 if idict['solution'] else None)
 
+            customization_args = (
+                state_domain.InteractionInstance.
+                convert_customization_args_dict_to_customization_args(
+                    idict['id'],
+                    idict['customization_args']
+                )
+            )
             state.interaction = state_domain.InteractionInstance(
-                idict['id'], idict['customization_args'],
+                idict['id'], customization_args,
                 interaction_answer_groups, default_outcome,
                 idict['confirmed_unclassified_answers'],
                 [state_domain.Hint.from_dict(h) for h in idict['hints']],
@@ -579,6 +684,8 @@ class Exploration(python_utils.OBJECT):
             state.written_translations = (
                 state_domain.WrittenTranslations.from_dict(
                     sdict['written_translations']))
+
+            state.next_content_id_index = sdict['next_content_id_index']
 
             state.solicit_answer_details = sdict['solicit_answer_details']
 
@@ -611,7 +718,7 @@ class Exploration(python_utils.OBJECT):
                 and the validation checks are stricter.
 
         Raises:
-            ValidationError: One or more attributes of the Exploration are
+            ValidationError. One or more attributes of the Exploration are
                 invalid.
         """
         if not isinstance(self.title, python_utils.BASESTRING):
@@ -898,7 +1005,7 @@ class Exploration(python_utils.OBJECT):
         """Verifies that all states are reachable from the initial state.
 
         Raises:
-            ValidationError: One or more states are not reachable from the
+            ValidationError. One or more states are not reachable from the
                 initial state of the Exploration.
         """
         # This queue stores state names.
@@ -933,7 +1040,7 @@ class Exploration(python_utils.OBJECT):
         """Verifies that all states can reach a terminal state.
 
         Raises:
-            ValidationError: If is impossible to complete the exploration from
+            ValidationError. If is impossible to complete the exploration from
                 a state.
         """
         # This queue stores state names.
@@ -980,7 +1087,7 @@ class Exploration(python_utils.OBJECT):
             state.
 
         Raises:
-            ValueError: The given state_name does not exist.
+            ValueError. The given state_name does not exist.
         """
         if state_name not in self.states:
             raise ValueError('State %s does not exist' % state_name)
@@ -1176,7 +1283,7 @@ class Exploration(python_utils.OBJECT):
             state_names: list(str). List of state names to add.
 
         Raises:
-            ValueError: At least one of the new state names already exists in
+            ValueError. At least one of the new state names already exists in
                 the states dict.
         """
         for state_name in state_names:
@@ -1195,7 +1302,7 @@ class Exploration(python_utils.OBJECT):
             new_state_name: str. The new state name.
 
         Raises:
-            ValueError: The old state name does not exist or the new state name
+            ValueError. The old state name does not exist or the new state name
                 is already in states dict.
         """
         if old_state_name not in self.states:
@@ -1232,7 +1339,7 @@ class Exploration(python_utils.OBJECT):
             state_name: str. The state name to be deleted.
 
         Raises:
-            ValueError: The state does not exist or is the initial state of the
+            ValueError. The state does not exist or is the initial state of the
                 exploration.
         """
         if state_name not in self.states:
@@ -1380,7 +1487,7 @@ class Exploration(python_utils.OBJECT):
         """
         content_count = 0
         for state in self.states.values():
-            content_count += state.get_content_count()
+            content_count += state.get_translatable_content_count()
 
         return content_count
 
@@ -2105,7 +2212,9 @@ class Exploration(python_utils.OBJECT):
         """
         for key, state_dict in states_dict.items():
             states_dict[key] = state_domain.State.convert_html_fields_in_state(
-                state_dict, html_validation_service.convert_to_textangular)
+                state_dict,
+                html_validation_service.convert_to_textangular,
+                state_uses_old_interaction_cust_args_schema=True)
         return states_dict
 
     @classmethod
@@ -2123,7 +2232,9 @@ class Exploration(python_utils.OBJECT):
         """
         for key, state_dict in states_dict.items():
             states_dict[key] = state_domain.State.convert_html_fields_in_state(
-                state_dict, html_validation_service.add_caption_attr_to_image)
+                state_dict,
+                html_validation_service.add_caption_attr_to_image,
+                state_uses_old_interaction_cust_args_schema=True)
         return states_dict
 
     @classmethod
@@ -2141,7 +2252,9 @@ class Exploration(python_utils.OBJECT):
         """
         for key, state_dict in states_dict.items():
             states_dict[key] = state_domain.State.convert_html_fields_in_state(
-                state_dict, html_validation_service.convert_to_ckeditor)
+                state_dict,
+                html_validation_service.convert_to_ckeditor,
+                state_uses_old_interaction_cust_args_schema=True)
         return states_dict
 
     @classmethod
@@ -2160,11 +2273,12 @@ class Exploration(python_utils.OBJECT):
         """
         for key, state_dict in states_dict.items():
             add_dimensions_to_image_tags = functools.partial(
-                html_validation_service.add_dimensions_to_image_tags, # pylint: disable=line-too-long
+                html_validation_service.add_dimensions_to_image_tags,
                 exp_id)
             states_dict[key] = state_domain.State.convert_html_fields_in_state(
                 state_dict,
-                add_dimensions_to_image_tags)
+                add_dimensions_to_image_tags,
+                state_uses_old_interaction_cust_args_schema=True)
             if state_dict['interaction']['id'] == 'ImageClickInput':
                 filename = state_dict['interaction']['customization_args'][
                     'imageAndRegions']['value']['imagePath']
@@ -2349,8 +2463,8 @@ class Exploration(python_utils.OBJECT):
         """
         for state_dict in states_dict.values():
             # Get the voiceovers_mapping metadata.
-            voiceovers_mapping = (state_dict['recorded_voiceovers']
-                                  ['voiceovers_mapping'])
+            voiceovers_mapping = (
+                state_dict['recorded_voiceovers']['voiceovers_mapping'])
             language_codes_to_audio_metadata = voiceovers_mapping.values()
             for language_codes in language_codes_to_audio_metadata:
                 for audio_metadata in language_codes.values():
@@ -2430,7 +2544,385 @@ class Exploration(python_utils.OBJECT):
         for key, state_dict in states_dict.items():
             states_dict[key] = state_domain.State.convert_html_fields_in_state(
                 state_dict,
-                html_validation_service.add_math_content_to_math_rte_components)
+                html_validation_service.add_math_content_to_math_rte_components,
+                state_uses_old_interaction_cust_args_schema=True)
+
+        return states_dict
+
+    @classmethod
+    def _convert_states_v34_dict_to_v35_dict(cls, states_dict):
+        """Converts from version 34 to 35. Version 35 upgrades all explorations
+        that use the MathExpressionInput interaction to use one of
+        AlgebraicExpressionInput, NumericExpressionInput, or MathEquationInput
+        interactions.
+
+        Args:
+            states_dict: dict. A dict where each key-value pair represents,
+                respectively, a state name and a dict used to initialize a
+                State domain object.
+
+        Returns:
+            dict. The converted states_dict.
+        """
+        is_valid_algebraic_expression = schema_utils.get_validator(
+            'is_valid_algebraic_expression')
+        is_valid_numeric_expression = schema_utils.get_validator(
+            'is_valid_numeric_expression')
+        is_valid_math_equation = schema_utils.get_validator(
+            'is_valid_math_equation')
+        ltt = latex2text.LatexNodes2Text()
+
+        for state_dict in states_dict.values():
+            if state_dict['interaction']['id'] == 'MathExpressionInput':
+                new_answer_groups = []
+                types_of_inputs = set()
+                for group in state_dict['interaction']['answer_groups']:
+                    new_answer_group = copy.deepcopy(group)
+                    for rule_spec in new_answer_group['rule_specs']:
+                        rule_input = ltt.latex_to_text(rule_spec['inputs']['x'])
+
+                        rule_input = clean_math_expression(
+                            rule_input)
+
+                        type_of_input = TYPE_INVALID_EXPRESSION
+                        if is_valid_algebraic_expression(rule_input):
+                            type_of_input = TYPE_VALID_ALGEBRAIC_EXPRESSION
+                        elif is_valid_numeric_expression(rule_input):
+                            type_of_input = TYPE_VALID_NUMERIC_EXPRESSION
+                        elif is_valid_math_equation(rule_input):
+                            type_of_input = TYPE_VALID_MATH_EQUATION
+
+                        types_of_inputs.add(type_of_input)
+
+                        if type_of_input != TYPE_INVALID_EXPRESSION:
+                            rule_spec['inputs']['x'] = rule_input
+                            if type_of_input == TYPE_VALID_MATH_EQUATION:
+                                rule_spec['inputs']['y'] = 'both'
+                            rule_spec['rule_type'] = 'MatchesExactlyWith'
+
+                    new_answer_groups.append(new_answer_group)
+
+                if TYPE_INVALID_EXPRESSION not in types_of_inputs:
+                    # If at least one rule input is an equation, we remove
+                    # all other rule inputs that are expressions.
+                    if TYPE_VALID_MATH_EQUATION in types_of_inputs:
+                        new_interaction_id = TYPE_VALID_MATH_EQUATION
+                        for group in new_answer_groups:
+                            new_rule_specs = []
+                            for rule_spec in group['rule_specs']:
+                                if is_valid_math_equation(
+                                        rule_spec['inputs']['x']):
+                                    new_rule_specs.append(rule_spec)
+                            group['rule_specs'] = new_rule_specs
+                    # Otherwise, if at least one rule_input is an algebraic
+                    # expression, we remove all other rule inputs that are
+                    # numeric expressions.
+                    elif TYPE_VALID_ALGEBRAIC_EXPRESSION in (
+                            types_of_inputs):
+                        new_interaction_id = TYPE_VALID_ALGEBRAIC_EXPRESSION
+                        for group in new_answer_groups:
+                            new_rule_specs = []
+                            for rule_spec in group['rule_specs']:
+                                if is_valid_algebraic_expression(
+                                        rule_spec['inputs']['x']):
+                                    new_rule_specs.append(rule_spec)
+                            group['rule_specs'] = new_rule_specs
+                    else:
+                        new_interaction_id = TYPE_VALID_NUMERIC_EXPRESSION
+
+                    # Removing answer groups that have no rule specs left after
+                    # the filtration done above.
+                    new_answer_groups = [
+                        answer_group for answer_group in new_answer_groups if (
+                            len(answer_group['rule_specs']) != 0)]
+
+                    # Removing feedback keys, from voiceovers_mapping and
+                    # translations_mapping, that correspond to the rules that
+                    # got deleted.
+                    old_answer_groups_feedback_keys = [
+                        answer_group['outcome'][
+                            'feedback']['content_id'] for answer_group in (
+                                state_dict['interaction']['answer_groups'])]
+                    new_answer_groups_feedback_keys = [
+                        answer_group['outcome'][
+                            'feedback']['content_id'] for answer_group in (
+                                new_answer_groups)]
+                    content_ids_to_delete = set(
+                        old_answer_groups_feedback_keys) - set(
+                            new_answer_groups_feedback_keys)
+                    for content_id in content_ids_to_delete:
+                        if content_id in state_dict['recorded_voiceovers'][
+                                'voiceovers_mapping']:
+                            del state_dict['recorded_voiceovers'][
+                                'voiceovers_mapping'][content_id]
+                        if content_id in state_dict['written_translations'][
+                                'translations_mapping']:
+                            del state_dict['written_translations'][
+                                'translations_mapping'][content_id]
+
+                    state_dict['interaction']['id'] = new_interaction_id
+                    state_dict['interaction']['answer_groups'] = (
+                        new_answer_groups)
+                    if state_dict['interaction']['solution']:
+                        correct_answer = state_dict['interaction'][
+                            'solution']['correct_answer']['ascii']
+                        correct_answer = clean_math_expression(correct_answer)
+                        state_dict['interaction'][
+                            'solution']['correct_answer'] = correct_answer
+
+        return states_dict
+
+    @classmethod
+    def _convert_states_v35_dict_to_v36_dict(cls, states_dict):
+        """Converts from version 35 to 36. Version 36 adds translation support
+        for interaction customization arguments. This migration converts
+        customization arguments whose schemas have been changed from unicode to
+        SubtitledUnicode or html to SubtitledHtml. It also populates missing
+        customization argument keys on all interactions, removes extra
+        customization arguments, normalizes customization arguments against
+        its schema, and changes PencilCodeEditor's customization argument
+        name from initial_code to initialCode.
+
+        Args:
+            states_dict: dict. A dict where each key-value pair represents,
+                respectively, a state name and a dict used to initialize a
+                State domain object.
+
+        Returns:
+            dict. The converted states_dict.
+        """
+        for state_dict in states_dict.values():
+            max_existing_content_id_index = -1
+            translations_mapping = state_dict[
+                'written_translations']['translations_mapping']
+            for content_id in translations_mapping:
+                # Find maximum existing content_id index.
+                content_id_suffix = content_id.split('_')[-1]
+
+                # Possible values of content_id_suffix are a digit, or from
+                # a 'outcome' (from 'default_outcome'). If the content_id_suffix
+                # is not a digit, we disregard it here.
+                if content_id_suffix.isdigit():
+                    max_existing_content_id_index = max(
+                        max_existing_content_id_index,
+                        int(content_id_suffix)
+                    )
+
+                # Move 'html' field to 'translation' field and set 'data_format'
+                # to 'html' for all WrittenTranslations.
+                for lang_code in translations_mapping[content_id]:
+                    translations_mapping[
+                        content_id][lang_code]['data_format'] = 'html'
+                    translations_mapping[
+                        content_id][lang_code]['translation'] = (
+                            translations_mapping[content_id][lang_code]['html'])
+                    del translations_mapping[content_id][lang_code]['html']
+
+            interaction_id = state_dict['interaction']['id']
+            if interaction_id is None:
+                state_dict['next_content_id_index'] = (
+                    max_existing_content_id_index + 1)
+                continue
+
+            class ContentIdCounter(python_utils.OBJECT):
+                """This helper class is used to keep track of
+                next_content_id_index and new_content_ids, and provides a
+                function to generate new content_ids.
+                """
+
+                new_content_ids = []
+
+                def __init__(self, next_content_id_index):
+                    """Initializes a ContentIdCounter object.
+
+                    Args:
+                        next_content_id_index: int. The next content id index.
+                    """
+                    self.next_content_id_index = next_content_id_index
+
+                def generate_content_id(self, content_id_prefix):
+                    """Generate a new content_id from the prefix provided and
+                    the next content id index.
+
+                    Args:
+                        content_id_prefix: str. The prefix of the content_id.
+
+                    Returns:
+                        str. The generated content_id.
+                    """
+                    content_id = '%s%i' % (
+                        content_id_prefix,
+                        self.next_content_id_index)
+                    self.next_content_id_index += 1
+                    self.new_content_ids.append(content_id)
+                    return content_id
+
+            content_id_counter = (
+                ContentIdCounter(max_existing_content_id_index + 1))
+
+            ca_dict = state_dict['interaction']['customization_args']
+            if (interaction_id == 'PencilCodeEditor' and
+                    'initial_code' in ca_dict):
+                ca_dict['initialCode'] = ca_dict['initial_code']
+                del ca_dict['initial_code']
+
+            # Retrieve a cached version (state schema v35) of
+            # interaction_specs.json to ensure that this migration remains
+            # stable even when interaction_specs.json is changed.
+            ca_specs = [
+                domain.CustomizationArgSpec(
+                    ca_spec_dict['name'],
+                    ca_spec_dict['description'],
+                    ca_spec_dict['schema'],
+                    ca_spec_dict['default_value']
+                ) for ca_spec_dict in (
+                    interaction_registry.Registry
+                    .get_all_specs_for_state_schema_version(36)[
+                        interaction_id]['customization_arg_specs']
+                )
+            ]
+
+            for ca_spec in ca_specs:
+                schema = ca_spec.schema
+                ca_name = ca_spec.name
+                content_id_prefix = 'ca_%s_' % ca_name
+
+                # We only have to migrate unicode to SubtitledUnicode or
+                # list of html to list of SubtitledHtml. No interactions
+                # were changed from html to SubtitledHtml.
+                is_subtitled_unicode_spec = (
+                    schema['type'] == schema_utils.SCHEMA_TYPE_CUSTOM and
+                    schema['obj_type'] ==
+                    schema_utils.SCHEMA_OBJ_TYPE_SUBTITLED_UNICODE)
+                is_subtitled_html_list_spec = (
+                    schema['type'] == schema_utils.SCHEMA_TYPE_LIST and
+                    schema['items']['type'] ==
+                    schema_utils.SCHEMA_TYPE_CUSTOM and
+                    schema['items']['obj_type'] ==
+                    schema_utils.SCHEMA_OBJ_TYPE_SUBTITLED_HTML)
+
+                if is_subtitled_unicode_spec:
+                    # Default is a SubtitledHtml dict or SubtitleUnicode dict.
+                    new_value = copy.deepcopy(ca_spec.default_value)
+
+                    # If available, assign value to html or unicode_str.
+                    if ca_name in ca_dict:
+                        new_value['unicode_str'] = ca_dict[ca_name]['value']
+
+                    # Assign content_id.
+                    new_value['content_id'] = (
+                        content_id_counter
+                        .generate_content_id(content_id_prefix)
+                    )
+
+                    ca_dict[ca_name] = {'value': new_value}
+                elif is_subtitled_html_list_spec:
+                    new_value = []
+
+                    if ca_name in ca_dict:
+                        # Assign values to html fields.
+                        for html in ca_dict[ca_name]['value']:
+                            new_value.append({
+                                'html': html, 'content_id': None
+                            })
+                    else:
+                        # Default is a list of SubtitledHtml dict.
+                        new_value.extend(copy.deepcopy(ca_spec.default_value))
+
+                    # Assign content_ids.
+                    for subtitled_html_dict in new_value:
+                        subtitled_html_dict['content_id'] = (
+                            content_id_counter
+                            .generate_content_id(content_id_prefix)
+                        )
+
+                    ca_dict[ca_name] = {'value': new_value}
+                elif ca_name not in ca_dict:
+                    ca_dict[ca_name] = {'value': ca_spec.default_value}
+
+            (
+                customization_args_util
+                .validate_customization_args_and_values(
+                    'interaction',
+                    interaction_id,
+                    ca_dict,
+                    ca_specs)
+            )
+
+            state_dict['next_content_id_index'] = (
+                content_id_counter.next_content_id_index)
+            for new_content_id in content_id_counter.new_content_ids:
+                state_dict[
+                    'written_translations'][
+                        'translations_mapping'][new_content_id] = {}
+                state_dict[
+                    'recorded_voiceovers'][
+                        'voiceovers_mapping'][new_content_id] = {}
+
+        return states_dict
+
+    @classmethod
+    def _convert_states_v36_dict_to_v37_dict(cls, states_dict):
+        """Converts from version 36 to 37. Version 37 changes all rules with
+        type CaseSensitiveEquals to Equals.
+
+        Args:
+            states_dict: dict. A dict where each key-value pair represents,
+                respectively, a state name and a dict used to initialize a
+                State domain object.
+
+        Returns:
+            dict. The converted states_dict.
+        """
+        for state_dict in states_dict.values():
+            if state_dict['interaction']['id'] != 'TextInput':
+                continue
+            answer_group_dicts = state_dict['interaction']['answer_groups']
+            for answer_group_dict in answer_group_dicts:
+                for rule_spec_dict in answer_group_dict['rule_specs']:
+                    if rule_spec_dict['rule_type'] == 'CaseSensitiveEquals':
+                        rule_spec_dict['rule_type'] = 'Equals'
+
+        return states_dict
+
+    @classmethod
+    def _convert_states_v37_dict_to_v38_dict(cls, states_dict):
+        """Converts from version 37 to 38. Version 38 adds a customization arg
+        for the Math interactions that allows creators to specify the letters
+        that would be displayed to the learner.
+
+        Args:
+            states_dict: dict. A dict where each key-value pair represents,
+                respectively, a state name and a dict used to initialize a
+                State domain object.
+
+        Returns:
+            dict. The converted states_dict.
+        """
+        for state_dict in states_dict.values():
+            if state_dict['interaction']['id'] in (
+                    'AlgebraicExpressionInput', 'MathEquationInput'):
+                variables = set()
+                for group in state_dict['interaction']['answer_groups']:
+                    for rule_spec in group['rule_specs']:
+                        rule_input = rule_spec['inputs']['x']
+                        for variable in expression_parser.get_variables(
+                                rule_input):
+                            # Replacing greek letter names with greek symbols.
+                            if len(variable) > 1:
+                                variable = (
+                                    constants.GREEK_LETTER_NAMES_TO_SYMBOLS[
+                                        variable])
+                            variables.add(variable)
+
+                customization_args = state_dict[
+                    'interaction']['customization_args']
+                customization_args.update({
+                    'customOskLetters': {
+                        'value': sorted(variables)
+                    }
+                })
+
         return states_dict
 
     @classmethod
@@ -2468,7 +2960,7 @@ class Exploration(python_utils.OBJECT):
     # incompatible changes are made to the exploration schema in the YAML
     # definitions, this version number must be changed and a migration process
     # put in place.
-    CURRENT_EXP_SCHEMA_VERSION = 39
+    CURRENT_EXP_SCHEMA_VERSION = 43
     LAST_UNTITLED_SCHEMA_VERSION = 9
 
     @classmethod
@@ -3386,6 +3878,93 @@ class Exploration(python_utils.OBJECT):
         return exploration_dict
 
     @classmethod
+    def _convert_v39_dict_to_v40_dict(cls, exploration_dict):
+        """Converts a v39 exploration dict into a v40 exploration dict.
+        Upgrades all explorations that use the MathExpressionInput interaction
+        to use one of AlgebraicExpressionInput, NumericExpressionInput, or
+        MathEquationInput interactions.
+
+        Args:
+            exploration_dict: dict. The dict representation of an exploration
+                with schema version v39.
+
+        Returns:
+            dict. The dict representation of the Exploration domain object,
+            following schema version v40.
+        """
+        exploration_dict['schema_version'] = 40
+
+        exploration_dict['states'] = cls._convert_states_v34_dict_to_v35_dict(
+            exploration_dict['states'])
+        exploration_dict['states_schema_version'] = 35
+
+        return exploration_dict
+
+    @classmethod
+    def _convert_v40_dict_to_v41_dict(cls, exploration_dict):
+        """Converts a v40 exploration dict into a v41 exploration dict.
+        Adds translation support to customization args.
+
+        Args:
+            exploration_dict: dict. The dict representation of an exploration
+                with schema version v40.
+
+        Returns:
+            dict. The dict representation of the Exploration domain object,
+            following schema version v41.
+        """
+        exploration_dict['schema_version'] = 41
+
+        exploration_dict['states'] = cls._convert_states_v35_dict_to_v36_dict(
+            exploration_dict['states'])
+        exploration_dict['states_schema_version'] = 36
+
+        return exploration_dict
+
+    @classmethod
+    def _convert_v41_dict_to_v42_dict(cls, exploration_dict):
+        """Converts a v41 exploration dict into a v42 exploration dict.
+        Adds translation support to customization args.
+
+        Args:
+            exploration_dict: dict. The dict representation of an exploration
+                with schema version v41.
+
+        Returns:
+            dict. The dict representation of the Exploration domain object,
+            following schema version v42.
+        """
+        exploration_dict['schema_version'] = 42
+
+        exploration_dict['states'] = cls._convert_states_v36_dict_to_v37_dict(
+            exploration_dict['states'])
+        exploration_dict['states_schema_version'] = 37
+
+        return exploration_dict
+
+    @classmethod
+    def _convert_v42_dict_to_v43_dict(cls, exploration_dict):
+        """Converts a v42 exploration dict into a v43 exploration dict.
+        Adds a customization arg for the Math interactions that allows creators
+        to specify the letters that would be displayed to the learner.
+
+        Args:
+            exploration_dict: dict. The dict representation of an exploration
+                with schema version v42.
+
+        Returns:
+            dict. The dict representation of the Exploration domain object,
+            following schema version v43.
+        """
+        exploration_dict['schema_version'] = 43
+
+        exploration_dict['states'] = cls._convert_states_v37_dict_to_v38_dict(
+            exploration_dict['states'])
+        exploration_dict['states_schema_version'] = 38
+
+        return exploration_dict
+
+    @classmethod
     def _migrate_to_latest_yaml_version(
             cls, yaml_content, exp_id, title=None, category=None):
         """Return the YAML content of the exploration in the latest schema
@@ -3403,8 +3982,8 @@ class Exploration(python_utils.OBJECT):
             schema version provided in 'yaml_content'.
 
         Raises:
-            Exception: 'yaml_content' or the exploration schema version is not
-                valid.
+            Exception. The 'yaml_content' or the exploration schema version is
+                not valid.
         """
         try:
             exploration_dict = utils.dict_from_yaml(yaml_content)
@@ -3613,6 +4192,26 @@ class Exploration(python_utils.OBJECT):
                 exploration_dict)
             exploration_schema_version = 39
 
+        if exploration_schema_version == 39:
+            exploration_dict = cls._convert_v39_dict_to_v40_dict(
+                exploration_dict)
+            exploration_schema_version = 40
+
+        if exploration_schema_version == 40:
+            exploration_dict = cls._convert_v40_dict_to_v41_dict(
+                exploration_dict)
+            exploration_schema_version = 41
+
+        if exploration_schema_version == 41:
+            exploration_dict = cls._convert_v41_dict_to_v42_dict(
+                exploration_dict)
+            exploration_schema_version = 42
+
+        if exploration_schema_version == 42:
+            exploration_dict = cls._convert_v42_dict_to_v43_dict(
+                exploration_dict)
+            exploration_schema_version = 43
+
         return (exploration_dict, initial_schema_version)
 
     @classmethod
@@ -3628,7 +4227,7 @@ class Exploration(python_utils.OBJECT):
             Exploration. The corresponding exploration domain object.
 
         Raises:
-            Exception: The initial schema version of exploration is less than
+            Exception. The initial schema version of exploration is less than
                 or equal to 9.
         """
         migration_result = cls._migrate_to_latest_yaml_version(
@@ -3660,7 +4259,7 @@ class Exploration(python_utils.OBJECT):
             Exploration. The corresponding exploration domain object.
 
         Raises:
-            Exception: The initial schema version of exploration is less than
+            Exception. The initial schema version of exploration is less than
                 or equal to 9.
         """
         migration_result = cls._migrate_to_latest_yaml_version(
@@ -3717,6 +4316,63 @@ class Exploration(python_utils.OBJECT):
             'states': {state_name: state.to_dict()
                        for (state_name, state) in self.states.items()}
         })
+
+    def serialize(self):
+        """Returns the object serialized as a JSON string.
+
+        Returns:
+            str. JSON-encoded utf-8 string encoding all of the information
+            composing the object.
+        """
+        exploration_dict = self.to_dict()
+        # The only reason we add the version parameter separately is that our
+        # yaml encoding/decoding of this object does not handle the version
+        # parameter.
+        # NOTE: If this changes in the future (i.e the version parameter is
+        # added as part of the yaml representation of this object), all YAML
+        # files must add a version parameter to their files with the correct
+        # version of this object. The line below must then be moved to
+        # to_dict().
+        exploration_dict['version'] = self.version
+
+        if self.created_on:
+            exploration_dict['created_on'] = (
+                utils.convert_naive_datetime_to_string(self.created_on))
+
+        if self.last_updated:
+            exploration_dict['last_updated'] = (
+                utils.convert_naive_datetime_to_string(self.last_updated))
+
+        return json.dumps(exploration_dict).encode('utf-8')
+
+    @classmethod
+    def deserialize(cls, json_string):
+        """Returns an Exploration domain object decoded from a JSON string.
+
+        Args:
+            json_string: str. A JSON-encoded utf-8 string that can be
+                decoded into a dictionary representing an Exploration. Only call
+                on strings that were created using serialize().
+
+        Returns:
+            Exploration. The corresponding Exploration domain object.
+        """
+        exploration_dict = json.loads(json_string.decode('utf-8'))
+        created_on = (
+            utils.convert_string_to_naive_datetime_object(
+                exploration_dict['created_on'])
+            if 'created_on' in exploration_dict else None)
+        last_updated = (
+            utils.convert_string_to_naive_datetime_object(
+                exploration_dict['last_updated'])
+            if 'last_updated' in exploration_dict else None)
+        exploration = cls.from_dict(
+            exploration_dict,
+            exploration_version=exploration_dict['version'],
+            exploration_created_on=created_on,
+            exploration_last_updated=last_updated)
+
+        return exploration
 
     def to_player_dict(self):
         """Returns a copy of the exploration suitable for inclusion in the
@@ -3844,7 +4500,7 @@ class ExplorationSummary(python_utils.OBJECT):
         """Validates various properties of the ExplorationSummary.
 
         Raises:
-            ValidationError: One or more attributes of the ExplorationSummary
+            ValidationError. One or more attributes of the ExplorationSummary
                 are invalid.
         """
         if not isinstance(self.title, python_utils.BASESTRING):

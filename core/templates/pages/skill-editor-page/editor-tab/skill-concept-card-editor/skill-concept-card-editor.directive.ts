@@ -51,13 +51,13 @@ require('pages/skill-editor-page/skill-editor-page.constants.ajs.ts');
 import { Subscription } from 'rxjs';
 
 angular.module('oppia').directive('skillConceptCardEditor', [
-  'GenerateContentIdService', 'SkillEditorStateService', 'SkillUpdateService',
-  'SubtitledHtmlObjectFactory', 'UrlInterpolationService',
+  'GenerateContentIdService', 'PageTitleService', 'SkillEditorStateService',
+  'SkillUpdateService', 'SubtitledHtmlObjectFactory', 'UrlInterpolationService',
   'WindowDimensionsService', 'WorkedExampleObjectFactory',
   'COMPONENT_NAME_WORKED_EXAMPLE',
   function(
-      GenerateContentIdService, SkillEditorStateService, SkillUpdateService,
-      SubtitledHtmlObjectFactory, UrlInterpolationService,
+      GenerateContentIdService, PageTitleService, SkillEditorStateService,
+      SkillUpdateService, SubtitledHtmlObjectFactory, UrlInterpolationService,
       WindowDimensionsService, WorkedExampleObjectFactory,
       COMPONENT_NAME_WORKED_EXAMPLE) {
     return {
@@ -67,8 +67,8 @@ angular.module('oppia').directive('skillConceptCardEditor', [
         '/pages/skill-editor-page/editor-tab/skill-concept-card-editor/' +
         'skill-concept-card-editor.directive.html'),
       controller: [
-        '$scope', '$filter', '$uibModal',
-        function($scope, $filter, $uibModal) {
+        '$filter', '$scope', '$uibModal',
+        function($filter, $scope, $uibModal) {
           var ctrl = this;
 
           $scope.getStaticImageUrl = function(imagePath) {
@@ -77,6 +77,8 @@ angular.module('oppia').directive('skillConceptCardEditor', [
 
           ctrl.directiveSubscriptions = new Subscription();
           var initBindableFieldsDict = function() {
+            PageTitleService.setPageSubtitleForMobileView(
+              SkillEditorStateService.getSkill().getDescription());
             $scope.bindableFieldsDict = {
               displayedConceptCardExplanation:
                 $scope.skill.getConceptCard().getExplanation().getHtml(),
@@ -84,8 +86,6 @@ angular.module('oppia').directive('skillConceptCardEditor', [
                 $scope.skill.getConceptCard().getWorkedExamples()
             };
           };
-
-          var workedExamplesMemento = null;
 
           $scope.isEditable = function() {
             return true;
@@ -189,9 +189,14 @@ angular.module('oppia').directive('skillConceptCardEditor', [
               !$scope.workedExamplesListIsShown);
           };
 
+          $scope.toggleSkillEditorCard = function() {
+            $scope.skillEditorCardIsShown = !$scope.skillEditorCardIsShown;
+          };
+
           ctrl.$onInit = function() {
             $scope.skill = SkillEditorStateService.getSkill();
             initBindableFieldsDict();
+            $scope.skillEditorCardIsShown = true;
             $scope.workedExamplesListIsShown = (
               !WindowDimensionsService.isWindowNarrow());
             ctrl.directiveSubscriptions.add(

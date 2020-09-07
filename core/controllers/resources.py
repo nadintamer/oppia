@@ -42,8 +42,8 @@ class ValueGeneratorHandler(base.BaseHandler):
                 value_generators_domain.Registry.get_generator_class_by_id(
                     generator_id).get_html_template())
         except Exception as e:
-            logging.error('Value generator not found: %s. %s' %
-                          (generator_id, e))
+            logging.error(
+                'Value generator not found: %s. %s' % (generator_id, e))
             raise self.PageNotFoundException
 
 
@@ -56,8 +56,8 @@ class AssetDevHandler(base.BaseHandler):
     _SUPPORTED_PAGE_CONTEXTS = [
         feconf.ENTITY_TYPE_EXPLORATION, feconf.ENTITY_TYPE_SKILL,
         feconf.ENTITY_TYPE_TOPIC, feconf.ENTITY_TYPE_STORY,
-        feconf.ENTITY_TYPE_QUESTION
-    ]
+        feconf.ENTITY_TYPE_QUESTION, feconf.IMAGE_CONTEXT_QUESTION_SUGGESTIONS,
+        feconf.IMAGE_CONTEXT_EXPLORATION_SUGGESTIONS]
 
     GET_HANDLER_ERROR_RETURN_TYPE = feconf.HANDLER_TYPE_JSON
 

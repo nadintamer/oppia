@@ -20,23 +20,23 @@
 import { downgradeInjectable } from '@angular/upgrade/static';
 import { Injectable } from '@angular/core';
 
-import { IParamChangeBackendDict, ParamChange } from
+import { ParamChangeBackendDict, ParamChange } from
   'domain/exploration/ParamChangeObjectFactory';
 import { ParamChangesObjectFactory } from
   'domain/exploration/ParamChangesObjectFactory';
-import { IParamSpecsBackendDict, ParamSpecs, ParamSpecsObjectFactory } from
+import { ParamSpecsBackendDict, ParamSpecs, ParamSpecsObjectFactory } from
   'domain/exploration/ParamSpecsObjectFactory';
 import { State } from 'domain/state/StateObjectFactory';
 import {
-  IStateObjectsBackendDict,
-  IVoiceoverObjectsDict,
+  StateObjectsBackendDict,
+  VoiceoverObjectsDict,
   States,
   StatesObjectFactory
 } from 'domain/exploration/StatesObjectFactory';
 
 import cloneDeep from 'lodash/cloneDeep';
 
-export interface IEditableExplorationDataBackendDict {
+export interface EditableExplorationDataBackendDict {
   'auto_tts_enabled': boolean;
   'category': string;
   'correctness_feedback_enabled': boolean;
@@ -46,11 +46,11 @@ export interface IEditableExplorationDataBackendDict {
   'language_code': string;
   'objective': string;
   'param_changes': IParamChangeBackendDict[];
-  'param_specs': IParamSpecsBackendDict;
+  'param_specs': ParamSpecsBackendDict;
   'rights': any;
   'show_state_editor_tutorial_on_load': boolean;
   'show_state_translation_tutorial_on_load': boolean,
-  'states': IStateObjectsBackendDict;
+  'states': StateObjectsBackendDict;
   'tags': string[];
   'title': string;
   'version': number;
@@ -127,7 +127,7 @@ export class EditableExplorationDataObjectFactory {
               private statesObjectFactory: StatesObjectFactory) {}
 
   createFromBackendDict(
-      editableExplorationBackendDict: IEditableExplorationDataBackendDict): EditableExplorationData {
+      editableExplorationBackendDict: EditableExplorationDataBackendDict): EditableExplorationData {
     return new EditableExplorationData(
       editableExplorationBackendDict.auto_tts_enabled,
       editableExplorationBackendDict.category,

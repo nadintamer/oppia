@@ -26,7 +26,6 @@ describe('Question Creation Service', function() {
   var $rootScope = null;
   var qcs = null;
   var SkillEditorStateService = null;
-  var $httpBackend = null;
   var $q = null;
   var SkillDifficultyObjectFactory = null;
   var QuestionObjectFactory = null;
@@ -35,7 +34,6 @@ describe('Question Creation Service', function() {
   var $uibModal = null;
 
   var SkillObjectFactory = null;
-  var $location = null;
   var skillSummaryDict = {
     id: 'skillId1',
     description: 'description1',
@@ -118,7 +116,6 @@ describe('Question Creation Service', function() {
         others: [skillSummaryDict]
       });
 
-      $httpBackend = $injector.get('$httpBackend');
       QuestionObjectFactory = $injector.get('QuestionObjectFactory');
 
       var sampleQuestionBackendDict = {
@@ -141,14 +138,20 @@ describe('Question Creation Service', function() {
                 refresher_exploration_id: null
               },
               rule_specs: [{
-                inputs: {
-                  x: 10
-                },
-                rule_type: 'Equals'
+                rule_type: 'Equals',
+                inputs: {x: 10}
               }],
             }],
             confirmed_unclassified_answers: [],
-            customization_args: {},
+            customization_args: {
+              placeholder: {
+                value: {
+                  content_id: 'ca_placeholder_0',
+                  unicode_str: ''
+                }
+              },
+              rows: { value: 1 }
+            },
             default_outcome: {
               dest: null,
               feedback: {
@@ -197,7 +200,6 @@ describe('Question Creation Service', function() {
       spyOn(QuestionObjectFactory, 'createDefaultQuestion').and.returnValue(
         sampleQuestion);
       $rootScope = $injector.get('$rootScope');
-      $location = $injector.get('$location');
     }));
 
     it('should create question', function() {
@@ -307,7 +309,6 @@ describe('Question Creation Service', function() {
       spyOn(
         SkillEditorStateService, 'getSkill').and.returnValue(skillObject);
 
-      $httpBackend = $injector.get('$httpBackend');
       QuestionObjectFactory = $injector.get('QuestionObjectFactory');
 
       var sampleQuestionBackendDict = {
@@ -330,10 +331,8 @@ describe('Question Creation Service', function() {
                 refresher_exploration_id: null
               },
               rule_specs: [{
-                inputs: {
-                  x: 10
-                },
-                rule_type: 'Equals'
+                rule_type: 'Equals',
+                inputs: {x: 10}
               }],
             }],
             confirmed_unclassified_answers: [],
@@ -386,7 +385,6 @@ describe('Question Creation Service', function() {
       spyOn(QuestionObjectFactory, 'createDefaultQuestion').and.returnValue(
         sampleQuestion);
       $rootScope = $injector.get('$rootScope');
-      $location = $injector.get('$location');
     }));
 
     it('should Alerts Service if populating misconceptions fails', function() {
@@ -409,13 +407,11 @@ describe('Question Creation Service', function() {
   });
 
   describe('when question misconceptions validation fails', function() {
-    var AlertsService = null;
     var $q = null;
     beforeEach(angular.mock.inject(function($injector) {
       qcs = $injector.get('QuestionCreationService');
       $q = $injector.get('$q');
       SkillEditorStateService = $injector.get('SkillEditorStateService');
-      AlertsService = $injector.get('AlertsService');
       SkillObjectFactory = $injector.get('SkillObjectFactory');
       SkillDifficultyObjectFactory = $injector.get(
         'SkillDifficultyObjectFactory');
@@ -478,7 +474,6 @@ describe('Question Creation Service', function() {
       spyOn(
         SkillEditorStateService, 'getSkill').and.returnValue(skillObject);
 
-      $httpBackend = $injector.get('$httpBackend');
       QuestionObjectFactory = $injector.get('QuestionObjectFactory');
 
       var sampleQuestionBackendDict = {
@@ -501,14 +496,20 @@ describe('Question Creation Service', function() {
                 refresher_exploration_id: null
               },
               rule_specs: [{
-                inputs: {
-                  x: 10
-                },
-                rule_type: 'Equals'
+                rule_type: 'Equals',
+                inputs: {x: 10}
               }],
             }],
             confirmed_unclassified_answers: [],
-            customization_args: {},
+            customization_args: {
+              placeholder: {
+                value: {
+                  content_id: 'ca_placeholder_0',
+                  unicode_str: ''
+                }
+              },
+              rows: { value: 1 }
+            },
             default_outcome: {
               dest: null,
               feedback: {
@@ -558,7 +559,6 @@ describe('Question Creation Service', function() {
       spyOn(QuestionObjectFactory, 'createDefaultQuestion').and.returnValue(
         sampleQuestion);
       $rootScope = $injector.get('$rootScope');
-      $location = $injector.get('$location');
     }));
 
     it('should not call question backend api service to create the question',

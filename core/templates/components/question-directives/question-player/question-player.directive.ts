@@ -79,11 +79,15 @@ require(
   'components/forms/schema-viewers/schema-based-primitive-viewer.directive.ts');
 require(
   'components/forms/schema-viewers/schema-based-unicode-viewer.directive.ts');
-require('components/question-directives/question-player/' +
+require(
+  'components/question-directives/question-player/' +
   'question-player.constants.ajs.ts');
 require(
   'components/question-directives/question-player/' +
   'question-player-concept-card-modal.controller.ts');
+require(
+  'components/question-directives/question-player/services/' +
+  'question-player-state.service.ts');
 require(
   'components/question-directives/question-player/' +
   'skill-mastery-modal.controller.ts');
@@ -111,12 +115,13 @@ require(
   'pages/exploration-player-page/layout-directives/' +
   'learner-view-info.directive.ts');
 
-require('domain/question/question-backend-api.service.ts');
 require('domain/skill/skill-mastery-backend-api.service.ts');
 require('domain/utilities/url-interpolation.service.ts');
-require('services/alerts.service.ts');
 require('services/user.service.ts');
-require('services/contextual/url.service.ts');
+require(
+  'pages/exploration-player-page/services/exploration-player-state.service.ts');
+
+import { Subscription } from 'rxjs';
 
 require('pages/interaction-specs.constants.ajs.ts');
 
@@ -135,28 +140,25 @@ angular.module('oppia').directive('questionPlayer', [
         'question-player.directive.html'),
       controllerAs: '$ctrl',
       controller: [
-        'HASH_PARAM', 'MAX_SCORE_PER_QUESTION',
-        '$scope', '$sce', '$rootScope', '$location',
-        '$sanitize', '$uibModal', '$window',
-        'AlertsService', 'HtmlEscaperService',
-        'QuestionBackendApiService', 'SkillMasteryBackendApiService',
-        'UrlService', 'UserService', 'COLORS_FOR_PASS_FAIL_MODE',
+        '$location', '$sanitize', '$sce', '$scope', '$uibModal', '$window',
+        'ExplorationPlayerStateService', 'PlayerPositionService',
+        'QuestionPlayerStateService', 'SkillMasteryBackendApiService',
+        'UserService', 'COLORS_FOR_PASS_FAIL_MODE', 'HASH_PARAM',
         'MAX_MASTERY_GAIN_PER_QUESTION', 'MAX_MASTERY_LOSS_PER_QUESTION',
-        'QUESTION_PLAYER_MODE', 'VIEW_HINT_PENALTY',
-        'VIEW_HINT_PENALTY_FOR_MASTERY',
-        'WRONG_ANSWER_PENALTY', 'WRONG_ANSWER_PENALTY_FOR_MASTERY',
+        'MAX_SCORE_PER_QUESTION', 'QUESTION_PLAYER_MODE', 'VIEW_HINT_PENALTY',
+        'VIEW_HINT_PENALTY_FOR_MASTERY', 'WRONG_ANSWER_PENALTY',
+        'WRONG_ANSWER_PENALTY_FOR_MASTERY',
         function(
-            HASH_PARAM, MAX_SCORE_PER_QUESTION,
-            $scope, $sce, $rootScope, $location,
-            $sanitize, $uibModal, $window,
-            AlertsService, HtmlEscaperService,
-            QuestionBackendApiService, SkillMasteryBackendApiService,
-            UrlService, UserService, COLORS_FOR_PASS_FAIL_MODE,
+            $location, $sanitize, $sce, $scope, $uibModal, $window,
+            ExplorationPlayerStateService, PlayerPositionService,
+            QuestionPlayerStateService, SkillMasteryBackendApiService,
+            UserService, COLORS_FOR_PASS_FAIL_MODE, HASH_PARAM,
             MAX_MASTERY_GAIN_PER_QUESTION, MAX_MASTERY_LOSS_PER_QUESTION,
-            QUESTION_PLAYER_MODE, VIEW_HINT_PENALTY,
-            VIEW_HINT_PENALTY_FOR_MASTERY,
-            WRONG_ANSWER_PENALTY, WRONG_ANSWER_PENALTY_FOR_MASTERY) {
+            MAX_SCORE_PER_QUESTION, QUESTION_PLAYER_MODE, VIEW_HINT_PENALTY,
+            VIEW_HINT_PENALTY_FOR_MASTERY, WRONG_ANSWER_PENALTY,
+            WRONG_ANSWER_PENALTY_FOR_MASTERY) {
           var ctrl = this;
+          ctrl.directiveSubscriptions = new Subscription();
           var initResults = function() {
             $scope.resultsLoaded = false;
             ctrl.currentQuestion = 0;
@@ -194,8 +196,9 @@ angular.module('oppia').directive('questionPlayer', [
               srcset="${getStaticImageUrl('/icons/rocket@2x.webp')}">
               <source type="image/png" 
               srcset="${getStaticImageUrl('/icons/rocket@2x.png')}">
-              <img class="action-button-icon" src="
-              ${getStaticImageUrl('/icons/rocket@2x.png')}"/>
+              <img alt=""
+                   class="action-button-icon" 
+                   src="${getStaticImageUrl('/icons/rocket@2x.png')}"/>
               </picture>`;
             } else if (actionButtonType === 'RETRY_SESSION') {
               iconHtml = '<i class="material-icons md-36 ' +
@@ -216,7 +219,8 @@ angular.module('oppia').directive('questionPlayer', [
           };
 
           ctrl.showActionButtonsFooter = function() {
-            return (ctrl.questionPlayerConfig.resultActionButtons &&
+            return (
+              ctrl.questionPlayerConfig.resultActionButtons &&
               ctrl.questionPlayerConfig.resultActionButtons.length > 0);
           };
 
@@ -304,7 +308,8 @@ angular.module('oppia').directive('questionPlayer', [
           };
 
           var isInPassOrFailMode = function() {
-            return (ctrl.questionPlayerConfig.questionPlayerMode &&
+            return (
+              ctrl.questionPlayerConfig.questionPlayerMode &&
               ctrl.questionPlayerConfig.questionPlayerMode.modeType ===
               QUESTION_PLAYER_MODE.PASS_FAIL_MODE);
           };
@@ -532,18 +537,25 @@ angular.module('oppia').directive('questionPlayer', [
           };
 
           ctrl.$onInit = function() {
-            $rootScope.$on('currentQuestionChanged', function(event, result) {
-              updateCurrentQuestion(result + 1);
-            });
+            ctrl.directiveSubscriptions.add(
+              PlayerPositionService.onCurrentQuestionChange.subscribe(
+                result => updateCurrentQuestion(result + 1)
+              )
+            );
 
-            $rootScope.$on('totalQuestionsReceived', function(event, result) {
-              updateTotalQuestions(result);
-            });
+            ctrl.directiveSubscriptions.add(
+              ExplorationPlayerStateService.onTotalQuestionsReceived.subscribe(
+                result => updateTotalQuestions(result)
+              )
+            );
 
-            $rootScope.$on('questionSessionCompleted', function(event, result) {
-              $location.hash(HASH_PARAM +
-                encodeURIComponent(JSON.stringify(result)));
-            });
+            ctrl.directiveSubscriptions.add(
+              QuestionPlayerStateService.onQuestionSessionCompleted.subscribe(
+                (result) => {
+                  $location.hash(
+                    HASH_PARAM + encodeURIComponent(JSON.stringify(result)));
+                })
+            );
 
             $scope.$on('$locationChangeSuccess', function(event) {
               var hashContent = $location.hash();
@@ -572,6 +584,10 @@ angular.module('oppia').directive('questionPlayer', [
             // called in $scope.$on when some external events are triggered.
             initResults();
             ctrl.questionPlayerConfig = ctrl.getQuestionPlayerConfig();
+          };
+
+          ctrl.$onDestroy = function() {
+            ctrl.directiveSubscriptions.unsubscribe();
           };
         }
       ]

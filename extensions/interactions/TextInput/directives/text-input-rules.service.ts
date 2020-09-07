@@ -20,20 +20,20 @@ import { Injectable } from '@angular/core';
 
 import { NormalizeWhitespacePipe } from
   'filters/string-utility-filters/normalize-whitespace.pipe';
-import { ITextInputAnswer } from 'interactions/answer-defs';
-import { ITextInputRuleInputs } from 'interactions/rule-input-defs';
+import { TextInputAnswer } from 'interactions/answer-defs';
+import { TextInputRuleInputs } from 'interactions/rule-input-defs';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TextInputRulesService {
   constructor(private nws: NormalizeWhitespacePipe) {}
-  Equals(answer: ITextInputAnswer, inputs: ITextInputRuleInputs): boolean {
+  Equals(answer: TextInputAnswer, inputs: TextInputRuleInputs): boolean {
     var normalizedAnswer = this.nws.transform(answer);
     var normalizedInput = this.nws.transform(inputs.x);
     return normalizedAnswer.toLowerCase() === normalizedInput.toLowerCase();
   }
-  FuzzyEquals(answer: ITextInputAnswer, inputs: ITextInputRuleInputs): boolean {
+  FuzzyEquals(answer: TextInputAnswer, inputs: TextInputRuleInputs): boolean {
     var normalizedAnswer = this.nws.transform(answer);
     var answerString = normalizedAnswer.toLowerCase();
 
@@ -55,27 +55,21 @@ export class TextInputRulesService {
         if (inputString.charAt(i - 1) === answerString.charAt(j - 1)) {
           editDistance[i][j] = editDistance[i - 1][j - 1];
         } else {
-          editDistance[i][j] = Math.min(editDistance[i - 1][j - 1],
-            editDistance[i][j - 1],
+          editDistance[i][j] = Math.min(
+            editDistance[i - 1][j - 1], editDistance[i][j - 1],
             editDistance[i - 1][j]) + 1;
         }
       }
     }
     return editDistance[inputString.length][answerString.length] === 1;
   }
-  CaseSensitiveEquals(
-      answer: ITextInputAnswer, inputs: ITextInputRuleInputs): boolean {
-    var normalizedAnswer = this.nws.transform(answer);
-    var normalizedInput = this.nws.transform(inputs.x);
-    return normalizedAnswer === normalizedInput;
-  }
-  StartsWith(answer: ITextInputAnswer, inputs: ITextInputRuleInputs): boolean {
+  StartsWith(answer: TextInputAnswer, inputs: TextInputRuleInputs): boolean {
     var normalizedAnswer = this.nws.transform(answer);
     var normalizedInput = this.nws.transform(inputs.x);
     return normalizedAnswer.toLowerCase().indexOf(
       normalizedInput.toLowerCase()) === 0;
   }
-  Contains(answer: ITextInputAnswer, inputs: ITextInputRuleInputs): boolean {
+  Contains(answer: TextInputAnswer, inputs: TextInputRuleInputs): boolean {
     var normalizedAnswer = this.nws.transform(answer);
     var normalizedInput = this.nws.transform(inputs.x);
     return normalizedAnswer.toLowerCase().indexOf(

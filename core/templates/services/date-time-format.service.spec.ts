@@ -17,6 +17,7 @@
  */
 
 import { DateTimeFormatService } from 'services/date-time-format.service';
+import moment from 'moment';
 
 // Needed because MockDateContructor should be of same type as
 // DateConstructor to be used in callFake.
@@ -46,12 +47,15 @@ describe('datetimeformatter', () => {
       } else {
         return new OldDate(millisSinceEpoch);
       }
-    // Need as any here because DateContructor has some properties on the
-    // function and this function doesn't really have those properties.
-    } as any as MockDateContructorType;
+    };
 
     // Mock Date() to give a time of NOW_MILLIS in GMT. (Unfortunately, there
     // doesn't seem to be a good way to set the timezone locale directly).
+    // This throws "Argument of type '(millisSinceEpoch?: number) => Date' is
+    // not assignable to parameter of type 'DateConstructor'." This is because
+    // the actual 'Date' has more properties than 'MockDateContructor'. We have
+    // only defined the properties we need in 'MockDateContructor'.
+    // @ts-expect-error
     spyOn(window, 'Date').and.callFake(MockDateContructor);
   });
 
@@ -78,6 +82,12 @@ describe('datetimeformatter', () => {
     expect(
       df.getLocaleAbbreviatedDatetimeString(
         NOW_MILLIS - 365 * 24 * 60 * 60 * 1000)).toBe('11/21/13');
+  });
+
+  it('should provide date time hour string', function() {
+    expect(
+      df.getLocaleDateTimeHourString(NOW_MILLIS)).toBe(
+      moment(new Date(NOW_MILLIS)).format('MMM D HH:mm A'));
   });
 
   it('should provide correct date format MM/DD/YYY string', () => {

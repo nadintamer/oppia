@@ -18,6 +18,7 @@
 
 import { fabric } from 'fabric';
 import { AppConstants } from 'app.constants';
+import { SvgFilenameEditorConstants } from './svg-filename-editor.constants';
 
 var initializeMockDocument = function(svgFilenameCtrl) {
   var mockDocument = document.createElement('div');
@@ -29,9 +30,15 @@ var initializeMockDocument = function(svgFilenameCtrl) {
     topAlphaDiv.setAttribute('id', 'top-' + colors[i] + '-alpha');
     var bottomAlphaDiv = document.createElement('div');
     bottomAlphaDiv.setAttribute('id', 'bottom-' + colors[i] + '-alpha');
+    var pickerAlpha = document.createElement('div');
+    pickerAlpha.setAttribute('class', 'picker_alpha');
+    var pickerSlider = document.createElement('div');
+    pickerSlider.setAttribute('class', 'picker_selector');
+    pickerAlpha.append(pickerSlider);
     colorDiv.appendChild(topAlphaDiv);
     colorDiv.appendChild(bottomAlphaDiv);
     mockDocument.appendChild(colorDiv);
+    mockDocument.appendChild(pickerAlpha);
   }
   var mockCanvas = document.createElement('canvas');
   mockDocument.setAttribute('id', svgFilenameCtrl.canvasContainerId);
@@ -47,28 +54,73 @@ describe('SvgFilenameEditor', function() {
   var CsrfService = null;
   var svgFilenameCtrl = null;
   var $scope = null;
+  // This sample SVG is generated using different tools present
+  // in the SVG editor.
   var samplesvg = (
     '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/' +
-    '1999/xlink" version="1.1" width="494" height="367" viewBox="0 0 494 367' +
+    '1999/xlink" version="1.1" width="494" height="368" viewBox="0 0 494 368' +
     '"><desc>Created with Fabric.js 3.6.3</desc><defs></defs><rect x="0" y="' +
-    '0" width="100%" height="100%" fill="rgba(10,245,49,0.607)"/><g transfor' +
-    'm="matrix(1 0 0 1 273.5 177.5)"><rect style="stroke: rgb(0,0,0); stroke' +
-    '-width: 9; stroke-dasharray: none; stroke-linecap: butt; stroke-dashoff' +
-    'set: 0; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(0,0,0);' +
-    ' fill-rule: nonzero; opacity: 1;" vector-effect="non-scaling-stroke" x=' +
-    '"-30" y="-35" rx="0" ry="0" width="60" height="70"/></g><g transform="m' +
-    'atrix(1 0 0 1 169.5 182.5)"><circle style="stroke: rgb(0,0,0); stroke-w' +
-    'idth: 9; stroke-dasharray: none; stroke-linecap: butt; stroke-dashoffse' +
-    't: 0; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(0,0,0); f' +
-    'ill-rule: nonzero; opacity: 1;" vector-effect="non-scaling-stroke" cx="' +
-    '0" cy="0" r="30"/></g><g transform="matrix(1 0 0 2.15 100.49 123.68)" s' +
-    'tyle=""><text font-family="helvetica" font-size="18" font-style="nor' +
-    'mal" font-weight="normal" style="stroke: none; stroke-width: 1; stroke-' +
-    'dasharray: none; stroke-linecap: butt; stroke-dashoffset: 0; stroke-lin' +
-    'ejoin: miter; stroke-miterlimit: 4; fill: rgb(0,0,0); fill-rule: nonzer' +
-    'o; opacity: 1; white-space: pre;"><tspan x="-43.99" y="-17.94" style="w' +
-    'hite-space: pre; ">Enter </tspan><tspan x="-43.99" y="29.25">Text</tspa' +
-    'n></text></g></svg>');
+    '0" width="100%" height="100%" fill="rgba(109,106,234,0.937)"/><g transf' +
+    'orm="matrix(1 0 0 1 324 91)"><rect style="stroke: rgb(0,0,0); stroke-wi' +
+    'dth: 3; stroke-dasharray: none; stroke-linecap: butt; stroke-dashoffset' +
+    ': 0; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(0,0,0); fi' +
+    'll-opacity: 0; fill-rule: nonzero; opacity: 1; vector-effect: non-scali' +
+    'ng-stroke" x="-30" y="-35" rx="0" ry="0" width="60" height="70"/></g><g' +
+    ' transform="matrix(1 0 0 1 321 209)"><circle style="stroke: rgb(0,0,0);' +
+    ' stroke-width: 3; stroke-dasharray: none; stroke-linecap: butt; stroke-' +
+    'dashoffset: 0; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(' +
+    '0,0,0); fill-opacity: 0; fill-rule: nonzero; opacity: 1; vector-effect:' +
+    ' non-scaling-stroke" cx="0" cy="0" r="30"/></g><g transform="matrix(1 0' +
+    ' 0 1 560 82)" style=""><text font-family="helvetica" font-size="18" fon' +
+    't-style="normal" font-weight="normal" style="stroke: none; stroke-width' +
+    ': 1; stroke-dasharray: none; stroke-linecap: butt; stroke-dashoffset: 0' +
+    '; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(0,0,0); fill-' +
+    'rule: nonzero; opacity: 1; white-space: pre;"><tspan x="-100" y="-17.94' +
+    '" style="stroke: rgb(0,0,0); stroke-width: 2; fill: rgb(255,0,0); ">▇' +
+    '</tspan><tspan x="-86.16" y="-17.94" style="white-space: pre; "> - Data' +
+    ' name 1 - 10</tspan><tspan x="-100" y="5.65" style="stroke: rgb(0,0,0);' +
+    ' stroke-width: 2; fill: rgb(0,255,0); ">▇</tspan><tspan x="-86.16" y=' +
+    '"5.65" style="white-space: pre; "> - Data name 2 - 10</tspan><tspan x="' +
+    '-100" y="29.25" style="stroke: rgb(0,0,0); stroke-width: 2; fill: rgb(1' +
+    '90,65,65); ">▇</tspan><tspan x="-86.16" y="29.25" style="white-space:' +
+    ' pre; "> - Data name - 10</tspan></text></g><g transform="matrix(1 0 0 ' +
+    '1 113 222)"><g style=""><g transform="matrix(0.5 0.87 -0.87 0.5 0 0)"><' +
+    'g style=""><g transform="matrix(1 0 0 1 0 0)" id="group0"><path d="M 15' +
+    '.000000000000004 -25.980762113533157 A 30 30 0 0 1 15.000000000000004 2' +
+    '5.980762113533157" style="stroke: rgb(255,0,0); stroke-width: 1; stroke' +
+    '-dasharray: none; stroke-linecap: butt; stroke-dashoffset: 0; stroke-li' +
+    'nejoin: miter; stroke-miterlimit: 4; fill: rgb(255,0,0); fill-rule: non' +
+    'zero; opacity: 1; vector-effect: non-scaling-stroke" id="group0"/></g><' +
+    'g transform="matrix(1 0 0 1 7.5 0)" id="group0"><polygon style="stroke:' +
+    ' rgb(255,0,0); stroke-width: 1; stroke-dasharray: none; stroke-linecap:' +
+    ' butt; stroke-dashoffset: 0; stroke-linejoin: miter; stroke-miterlimit:' +
+    ' 4; fill: rgb(255,0,0); fill-rule: nonzero; opacity: 1; vector-effect: ' +
+    'non-scaling-stroke" points="-7.5,0 7.5,25.98 7.5,-25.98 -7.5,0 " id="gr' +
+    'oup0"/></g></g></g><g transform="matrix(-1 0 0 -1 0 0)"><g style=""><g ' +
+    'transform="matrix(1 0 0 1 0 0)" id="group0"><path d="M 15.0000000000000' +
+    '04 -25.980762113533157 A 30 30 0 0 1 15.000000000000004 25.980762113533' +
+    '157" style="stroke: rgb(0,255,0); stroke-width: 1; stroke-dasharray: no' +
+    'ne; stroke-linecap: butt; stroke-dashoffset: 0; stroke-linejoin: miter;' +
+    ' stroke-miterlimit: 4; fill: rgb(0,255,0); fill-rule: nonzero; opacity:' +
+    ' 1; vector-effect: non-scaling-stroke" id="group0"/></g><g transform="m' +
+    'atrix(1 0 0 1 7.5 0)" id="group0"><polygon style="stroke: rgb(0,255,0);' +
+    ' stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-' +
+    'dashoffset: 0; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(' +
+    '0,255,0); fill-rule: nonzero; opacity: 1; vector-effect: non-scaling-st' +
+    'roke" points="-7.5,0 7.5,25.98 7.5,-25.98 -7.5,0 " id="group0"/></g></g' +
+    '></g><g transform="matrix(0.5 -0.87 0.87 0.5 0 0)"><g style=""><g trans' +
+    'form="matrix(1 0 0 1 0 0)" id="group0"><path d="M 14.999999999999996 -2' +
+    '5.98076211353316 A 30 30 0 0 1 14.999999999999996 25.98076211353316" st' +
+    'yle="stroke: rgb(190,65,65); stroke-width: 1; stroke-dasharray: none; s' +
+    'troke-linecap: butt; stroke-dashoffset: 0; stroke-linejoin: miter; stro' +
+    'ke-miterlimit: 4; fill: rgb(190,65,65); fill-rule: nonzero; opacity: 1;' +
+    ' vector-effect: non-scaling-stroke" id="group0"/></g><g transform="matr' +
+    'ix(1 0 0 1 7.5 0)" id="group0"><polygon style="stroke: rgb(190,65,65); ' +
+    'stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-d' +
+    'ashoffset: 0; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(1' +
+    '90,65,65); fill-rule: nonzero; opacity: 1; vector-effect: non-scaling-s' +
+    'troke" points="-7.5,0 7.5,25.98 7.5,-25.98 -7.5,0 " id="group0"/></g></' +
+    'g></g></g></g></svg>');
   var dataUrl = 'data:image/svg+xml;utf8,' + samplesvg;
 
   var mockAssetsBackendApiService = {
@@ -98,20 +150,19 @@ describe('SvgFilenameEditor', function() {
     }
   };
 
-  var mockWindowDimenesionService = {
-    getResizeEvent: function() {
-      return {
-        subscribe: function(callback) {
-          callback();
-          return {
-            unsubscribe: function() {
-              return 'Unsubscribe Successful';
-            }
-          };
-        }
+  class mockReaderObject {
+    result = null;
+    onload = null;
+    constructor() {
+      this.onload = function() {
+        return 'Fake onload executed';
       };
     }
-  };
+    readAsDataURL(file) {
+      this.onload();
+      return 'The file is loaded';
+    }
+  }
 
   class mockImageObject {
     source = null;
@@ -137,7 +188,6 @@ describe('SvgFilenameEditor', function() {
     $provide.value('ImageLocalStorageService', {});
     $provide.value('ImagePreloaderService', mockImagePreloaderService);
     $provide.value('ImageUploadHelperService', mockImageUploadHelperService);
-    $provide.value('WindowDimensionsService', mockWindowDimenesionService);
   }));
   beforeEach(angular.mock.inject(function($injector, $componentController, $q) {
     contextService = $injector.get('ContextService');
@@ -156,9 +206,18 @@ describe('SvgFilenameEditor', function() {
       deferred.resolve('sample-csrf-token');
       return deferred.promise;
     });
-    // @ts-ignore inorder to ignore other Image object properties that
-    // should be declared.
+    // This throws "Argument of type 'mockImageObject' is not assignable to
+    // parameter of type 'HTMLImageElement'.". This is because
+    // 'HTMLImageElement' has around 250 more properties. We have only defined
+    // the properties we need in 'mockImageObject'.
+    // @ts-expect-error
     spyOn(window, 'Image').and.returnValue(new mockImageObject());
+    // This throws "Argument of type 'mockReaderObject' is not assignable to
+    // parameter of type 'HTMLImageElement'.". This is because
+    // 'HTMLImageElement' has around 250 more properties. We have only defined
+    // the properties we need in 'mockReaderObject'.
+    // @ts-expect-error
+    spyOn(window, 'FileReader').and.returnValue(new mockReaderObject());
 
     svgFilenameCtrl = $componentController('svgFilenameEditor');
     initializeMockDocument(svgFilenameCtrl);
@@ -172,39 +231,46 @@ describe('SvgFilenameEditor', function() {
     };
     svgFilenameCtrl.fillPicker = mockPicker;
     svgFilenameCtrl.strokePicker = mockPicker;
+    svgFilenameCtrl.bgPicker = mockPicker;
   }));
-
-  afterAll(function() {
-    svgFilenameCtrl.$onDestroy();
-  });
 
   it('should update diagram size', function() {
     var WIDTH = 100;
     var HEIGHT = 100;
-    var MAX_DIAGRAM_WIDTH = 491;
-    var MAX_DIAGRAM_HEIGHT = 551;
     svgFilenameCtrl.diagramWidth = WIDTH;
     svgFilenameCtrl.diagramHeight = HEIGHT;
     svgFilenameCtrl.onWidthInputBlur();
     expect(svgFilenameCtrl.currentDiagramWidth).toBe(WIDTH);
     svgFilenameCtrl.onHeightInputBlur();
     expect(svgFilenameCtrl.currentDiagramHeight).toBe(HEIGHT);
-    svgFilenameCtrl.diagramWidth = 600;
-    svgFilenameCtrl.diagramHeight = 600;
-    svgFilenameCtrl.onWidthInputBlur();
-    expect(svgFilenameCtrl.currentDiagramWidth).toBe(MAX_DIAGRAM_WIDTH);
-    svgFilenameCtrl.onHeightInputBlur();
-    expect(svgFilenameCtrl.currentDiagramHeight).toBe(MAX_DIAGRAM_HEIGHT);
   });
 
-  it('should return information on diagram size', function() {
-    var maxDiagramWidth = 491;
-    var maxDiagramHeight = 551;
-    var helpText = (
-      'This diagram has a maximum dimension of ' +
-      maxDiagramWidth + 'px X ' + maxDiagramHeight +
-      'px to ensure that it fits in the card.');
-    expect(svgFilenameCtrl.getDiagramSizeInfo()).toBe(helpText);
+  it('should reset to maximum width correctly', function() {
+    svgFilenameCtrl.diagramWidth = 600;
+    svgFilenameCtrl.onWidthInputBlur();
+    expect(svgFilenameCtrl.currentDiagramWidth).toBe(
+      SvgFilenameEditorConstants.MAX_SVG_DIAGRAM_WIDTH);
+  });
+
+  it('should reset to maximum height correctly', function() {
+    svgFilenameCtrl.diagramHeight = 600;
+    svgFilenameCtrl.onHeightInputBlur();
+    expect(svgFilenameCtrl.currentDiagramHeight).toBe(
+      SvgFilenameEditorConstants.MAX_SVG_DIAGRAM_HEIGHT);
+  });
+
+  it('should reset to minimum width correctly', function() {
+    svgFilenameCtrl.diagramWidth = 0;
+    svgFilenameCtrl.onWidthInputBlur();
+    expect(svgFilenameCtrl.currentDiagramWidth).toBe(
+      SvgFilenameEditorConstants.MIN_SVG_DIAGRAM_WIDTH);
+  });
+
+  it('should reset to minimum height correctly', function() {
+    svgFilenameCtrl.diagramHeight = 0;
+    svgFilenameCtrl.onHeightInputBlur();
+    expect(svgFilenameCtrl.currentDiagramHeight).toBe(
+      SvgFilenameEditorConstants.MIN_SVG_DIAGRAM_HEIGHT);
   });
 
   it('should check if diagram is created', function() {
@@ -241,13 +307,30 @@ describe('SvgFilenameEditor', function() {
     svgFilenameCtrl.createClosedPolygon();
   });
 
+  it('should change the order of shapes', function() {
+    svgFilenameCtrl.createCircle();
+    svgFilenameCtrl.createRect();
+    expect(svgFilenameCtrl.canvas.getObjects()[0].get('type')).toBe('circle');
+    expect(svgFilenameCtrl.canvas.getObjects()[1].get('type')).toBe('rect');
+    svgFilenameCtrl.canvas.setActiveObject(
+      svgFilenameCtrl.canvas.getObjects()[0]);
+    svgFilenameCtrl.bringObjectForward();
+    expect(svgFilenameCtrl.canvas.getObjects()[0].get('type')).toBe('rect');
+    expect(svgFilenameCtrl.canvas.getObjects()[1].get('type')).toBe('circle');
+    svgFilenameCtrl.sendObjectBackward();
+    expect(svgFilenameCtrl.canvas.getObjects()[0].get('type')).toBe('circle');
+    expect(svgFilenameCtrl.canvas.getObjects()[1].get('type')).toBe('rect');
+  });
+
   it('should undo and redo the creation of shapes', function() {
     for (var i = 0; i < 6; i++) {
       svgFilenameCtrl.createRect();
     }
     expect(svgFilenameCtrl.canvas.getObjects().length).toBe(6);
+    expect(svgFilenameCtrl.isUndoEnabled()).toBe(true);
     svgFilenameCtrl.onUndo();
     expect(svgFilenameCtrl.canvas.getObjects().length).toBe(5);
+    expect(svgFilenameCtrl.isRedoEnabled()).toBe(true);
     svgFilenameCtrl.onRedo();
     expect(svgFilenameCtrl.canvas.getObjects().length).toBe(6);
     svgFilenameCtrl.canvas.setActiveObject(
@@ -258,6 +341,7 @@ describe('SvgFilenameEditor', function() {
     expect(svgFilenameCtrl.canvas.getObjects().length).toBe(6);
     svgFilenameCtrl.onRedo();
     expect(svgFilenameCtrl.canvas.getObjects().length).toBe(5);
+    expect(svgFilenameCtrl.isClearEnabled()).toBe(true);
     svgFilenameCtrl.onClear();
     expect(svgFilenameCtrl.objectUndoStack.length).toBe(0);
   });
@@ -281,13 +365,13 @@ describe('SvgFilenameEditor', function() {
     expect(svgFilenameCtrl.canvas.backgroundColor).toBe(color);
     expect(rectShape.get('strokeWidth')).toBe(10);
     svgFilenameCtrl.createText();
+    svgFilenameCtrl.canvas.discardActiveObject();
+    svgFilenameCtrl.canvas.setActiveObject(
+      svgFilenameCtrl.canvas.getObjects()[1]);
     svgFilenameCtrl.fabricjsOptions.bold = true;
     svgFilenameCtrl.fabricjsOptions.italic = true;
     svgFilenameCtrl.fabricjsOptions.fontFamily = 'comic sans ms';
     svgFilenameCtrl.fabricjsOptions.size = '12px';
-    svgFilenameCtrl.canvas.discardActiveObject();
-    svgFilenameCtrl.canvas.setActiveObject(
-      svgFilenameCtrl.canvas.getObjects()[1]);
     svgFilenameCtrl.onItalicToggle();
     svgFilenameCtrl.onBoldToggle();
     svgFilenameCtrl.onFontChange();
@@ -301,29 +385,29 @@ describe('SvgFilenameEditor', function() {
 
   it('should draw polygon using mouse events', function() {
     svgFilenameCtrl.createClosedPolygon();
-    svgFilenameCtrl.canvas.trigger('mouse:down', {
+    svgFilenameCtrl.canvas.fire('mouse:down', {
       e: {
         pageX: 0,
         pageY: 0
       }
     });
-    svgFilenameCtrl.canvas.trigger('mouse:move', {
+    svgFilenameCtrl.canvas.fire('mouse:move', {
       e: {
         pageX: 100,
         pageY: 100
       }
     });
-    svgFilenameCtrl.canvas.trigger('mouse:dblclick');
+    svgFilenameCtrl.canvas.fire('mouse:dblclick');
     expect(svgFilenameCtrl.canvas.getObjects()[0].get('type')).toBe('polyline');
     svgFilenameCtrl.createClosedPolygon();
     svgFilenameCtrl.isTouchDevice = true;
-    svgFilenameCtrl.canvas.trigger('mouse:down', {
+    svgFilenameCtrl.canvas.fire('mouse:down', {
       e: {
         pageX: 0,
         pageY: 0
       }
     });
-    svgFilenameCtrl.canvas.trigger('mouse:down', {
+    svgFilenameCtrl.canvas.fire('mouse:down', {
       e: {
         pageX: 10,
         pageY: 10
@@ -333,6 +417,82 @@ describe('SvgFilenameEditor', function() {
     expect(svgFilenameCtrl.canvas.getObjects()[1].get('type')).toBe('polyline');
   });
 
+  it('should create a bezier curve', function() {
+    svgFilenameCtrl.createRect();
+    svgFilenameCtrl.createQuadraticBezier();
+    expect(svgFilenameCtrl.isDrawModeBezier()).toBe(true);
+    svgFilenameCtrl.canvas.fire('object:moving', {
+      target: {
+        name: 'p0',
+        left: 100,
+        top: 100
+      }
+    });
+    svgFilenameCtrl.canvas.fire('object:moving', {
+      target: {
+        name: 'p1',
+        left: 200,
+        top: 200
+      }
+    });
+    svgFilenameCtrl.canvas.fire('object:moving', {
+      target: {
+        name: 'p2',
+        left: 300,
+        top: 300
+      }
+    });
+    svgFilenameCtrl.onStrokeChange();
+    svgFilenameCtrl.onFillChange();
+    svgFilenameCtrl.onSizeChange();
+    svgFilenameCtrl.createQuadraticBezier();
+    expect(svgFilenameCtrl.isDrawModeBezier()).toBe(false);
+    expect(svgFilenameCtrl.canvas.getObjects()[1].get('path')).toEqual(
+      [['M', 100, 100], ['Q', 200, 200, 300, 300]]
+    );
+    expect(svgFilenameCtrl.canvas.getObjects()[1].get('type')).toBe('path');
+  });
+
+  it('should create a pie chart', function() {
+    svgFilenameCtrl.createPieChart();
+    expect(svgFilenameCtrl.isPieChartEnabled()).toBe(true);
+    expect(svgFilenameCtrl.isDrawModePieChart()).toBe(true);
+    svgFilenameCtrl.onAddItem();
+    svgFilenameCtrl.pieChartDataInput[2].data = 100;
+    svgFilenameCtrl.createPieChart();
+    expect(svgFilenameCtrl.isDrawModePieChart()).toBe(false);
+  });
+
+  it('should upload an svg file', function() {
+    var fileContent = (
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjA' +
+      'wMC9zdmciICB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5' +
+      'PSI1MCIgcj0iNDAiIHN0cm9rZT0iZ3JlZW4iIHN0cm9rZS13aWR0aD0iNCIgZmlsbD0ie' +
+      'WVsbG93IiAvPjwvc3ZnPg==');
+    svgFilenameCtrl.uploadSvgFile();
+    expect(svgFilenameCtrl.isSvgUploadEnabled()).toBe(true);
+    expect(svgFilenameCtrl.isDrawModeSvgUpload()).toBe(true);
+    var file = new File([fileContent], 'circle.svg', {type: 'image/svg'});
+    svgFilenameCtrl.onFileChanged(file, 'circle.svg');
+    svgFilenameCtrl.uploadedSvgDataUrl = fileContent;
+    expect(svgFilenameCtrl.isFileUploaded()).toBe(true);
+    svgFilenameCtrl.uploadSvgFile();
+    expect(svgFilenameCtrl.canvas.getObjects()[0].get('type')).toBe('group');
+    svgFilenameCtrl.canvas.setActiveObject(
+      svgFilenameCtrl.canvas.getObjects()[0]);
+    expect(svgFilenameCtrl.displayFontStyles).toBe(false);
+    svgFilenameCtrl.uploadSvgFile();
+    expect(svgFilenameCtrl.isDrawModeSvgUpload()).toBe(true);
+    var file = new File([fileContent], 'circle.svg', {type: 'image/svg'});
+    svgFilenameCtrl.onFileChanged(file, 'circle.svg');
+    svgFilenameCtrl.uploadedSvgDataUrl = fileContent;
+    expect(svgFilenameCtrl.isFileUploaded()).toBe(true);
+    svgFilenameCtrl.loadType = 'nogroup';
+    svgFilenameCtrl.uploadSvgFile();
+    expect(svgFilenameCtrl.canvas.getObjects()[1].get('type')).toBe('circle');
+  });
+
+
   it('should trigger object selection and scaling events', function() {
     svgFilenameCtrl.createRect();
     svgFilenameCtrl.createText();
@@ -340,8 +500,9 @@ describe('SvgFilenameEditor', function() {
       svgFilenameCtrl.canvas.getObjects()[0]);
     svgFilenameCtrl.canvas.setActiveObject(
       svgFilenameCtrl.canvas.getObjects()[1]);
+    expect(svgFilenameCtrl.isSizeVisible()).toBe(true);
     expect(svgFilenameCtrl.displayFontStyles).toBe(true);
-    svgFilenameCtrl.canvas.trigger('object:scaling');
+    svgFilenameCtrl.canvas.fire('object:scaling');
     expect(svgFilenameCtrl.canvas.getObjects()[1].get('scaleX')).toBe(1);
     expect(svgFilenameCtrl.canvas.getObjects()[1].get('scaleY')).toBe(1);
   });
@@ -357,33 +518,39 @@ describe('SvgFilenameEditor', function() {
     var responseText = ")]}'\n{ \"filename\": \"imageFile1.svg\" }";
     /* eslint-enable quotes */
 
-    // @ts-ignore in order to ignore JQuery properties that should
-    // be declared.
+    // This throws "Argument of type '() => Promise<any, any, any>' is not
+    // assignable to parameter of type '{ (url: string, ...):
+    // jqXHR<any>; ...}'.". We need to suppress this error because we need
+    // to mock $.ajax to this function purposes.
+    // @ts-expect-error
     spyOn($, 'ajax').and.callFake(function() {
       var d = $.Deferred();
       d.resolve(responseText);
       return d.promise();
     });
-    svgFilenameCtrl.saveSVGFile();
+    svgFilenameCtrl.saveSvgFile();
 
     // $q Promises need to be forcibly resolved through a JavaScript digest,
     // which is what $apply helps kick-start.
     $scope.$apply();
-    expect(svgFilenameCtrl.data.savedSVGFileName).toBe('imageFile1.svg');
-    expect(svgFilenameCtrl.data.savedSVGUrl.toString()).toBe(dataUrl);
+    expect(svgFilenameCtrl.data.savedSvgFileName).toBe('imageFile1.svg');
+    expect(svgFilenameCtrl.data.savedSvgUrl.toString()).toBe(dataUrl);
     expect(svgFilenameCtrl.validate()).toBe(true);
   });
 
   it('should not save svg file when no diagram is created', function() {
-    svgFilenameCtrl.saveSVGFile();
+    svgFilenameCtrl.saveSvgFile();
     expect(alertSpy).toHaveBeenCalledWith('Custom Diagram not created.');
   });
 
   it('should handle rejection when saving an svg file fails', function() {
     svgFilenameCtrl.createRect();
     var errorMessage = 'Error on saving svg file';
-    // @ts-ignore in order to ignore JQuery properties that should
-    // be declared.
+    // This throws "Argument of type '() => Promise<any, any, any>' is not
+    // assignable to parameter of type '{ (url: string, ...):
+    // jqXHR<any>; ...}'.". We need to suppress this error because we need
+    // to mock $.ajax to this function purposes.
+    // @ts-expect-error
     spyOn($, 'ajax').and.callFake(function() {
       var d = $.Deferred();
       d.reject({
@@ -397,7 +564,7 @@ describe('SvgFilenameEditor', function() {
       });
       return d.promise();
     });
-    svgFilenameCtrl.saveSVGFile();
+    svgFilenameCtrl.saveSvgFile();
 
     // $q Promises need to be forcibly resolved through a JavaScript digest,
     // which is what $apply helps kick-start.
@@ -406,9 +573,15 @@ describe('SvgFilenameEditor', function() {
   });
 
   it('should allow user to continue editing the diagram', function() {
-    svgFilenameCtrl.savedSVGDiagram = 'saved';
-    svgFilenameCtrl.savedSVGDiagram = samplesvg;
+    svgFilenameCtrl.savedSvgDiagram = 'saved';
+    svgFilenameCtrl.savedSvgDiagram = samplesvg;
     svgFilenameCtrl.continueDiagramEditing();
+    var mocktoSVG = function(arg) {
+      return '<path></path>';
+    };
+    var customToSVG = svgFilenameCtrl.createCustomToSVG(
+      mocktoSVG, 'path', 'group1');
+    expect(customToSVG()).toBe('<path id="group1"/>');
     expect(svgFilenameCtrl.diagramStatus).toBe('editing');
   });
 });
@@ -455,10 +628,6 @@ describe('SvgFilenameEditor initialized with value attribute',
       initializeMockDocument(svgFilenameCtrl);
     }));
 
-    afterEach(function() {
-      svgFilenameCtrl.$onDestroy();
-    });
-
     it('should load the svg file', function() {
       svgFilenameCtrl.$onInit();
       $httpBackend.expect(
@@ -466,7 +635,7 @@ describe('SvgFilenameEditor initialized with value attribute',
       ).respond(samplesvg);
       $httpBackend.flush();
       expect(svgFilenameCtrl.diagramStatus).toBe('saved');
-      expect(svgFilenameCtrl.savedSVGDiagram).toBe(samplesvg);
+      expect(svgFilenameCtrl.savedSvgDiagram).toBe(samplesvg);
     });
   }
 );
@@ -491,6 +660,9 @@ describe('SvgFilenameEditor with image save destination as ' +
     },
     deleteImage: function(filename) {
       return 'Image file is deleted.';
+    },
+    isInStorage: function(filename) {
+      return true;
     }
   };
 
@@ -554,11 +726,17 @@ describe('SvgFilenameEditor with image save destination as ' +
     spyOn(contextService, 'getImageSaveDestination').and.returnValue(
       AppConstants.IMAGE_SAVE_DESTINATION_LOCAL_STORAGE);
 
-    // @ts-ignore inorder to ignore other Image object properties that
-    // should be declared.
+    // This throws "Argument of type 'mockImageObject' is not assignable to
+    // parameter of type 'HTMLImageElement'.". This is because
+    // 'HTMLImageElement' has around 250 more properties. We have only defined
+    // the properties we need in 'mockImageObject'.
+    // @ts-expect-error
     spyOn(window, 'Image').and.returnValue(new mockImageObject());
-    // @ts-ignore inorder to ignore other FileReader object properties that
-    // should be declared.
+    // This throws "Argument of type 'mockReaderObject' is not assignable
+    // to parameter of type 'FileReader'.". This is because
+    // 'FileReader' has around 15 more properties. We have only defined
+    // the properties we need in 'mockReaderObject'.
+    // @ts-expect-error
     spyOn(window, 'FileReader').and.returnValue(new mockReaderObject());
 
     svgFilenameCtrl = $componentController('svgFilenameEditor');
@@ -568,25 +746,21 @@ describe('SvgFilenameEditor with image save destination as ' +
     svgFilenameCtrl.initializeMouseEvents();
   }));
 
-  afterEach(function() {
-    svgFilenameCtrl.$onDestroy();
-  });
-
   it('should save svg file to local storage created by the svg editor',
     function() {
       svgFilenameCtrl.createRect();
-      svgFilenameCtrl.saveSVGFile();
-      expect(svgFilenameCtrl.data.savedSVGFileName).toBe('350_450.svg');
-      expect(svgFilenameCtrl.data.savedSVGUrl.toString()).toBe(dataUrl);
+      svgFilenameCtrl.saveSvgFile();
+      expect(svgFilenameCtrl.data.savedSvgFileName).toBe('350_450.svg');
+      expect(svgFilenameCtrl.data.savedSvgUrl.toString()).toBe(dataUrl);
       expect(svgFilenameCtrl.validate()).toBe(true);
     }
   );
 
   it('should allow user to continue editing the diagram and delete the ' +
     'image from local storage', function() {
-    svgFilenameCtrl.data.savedSVGFileName = 'image.svg';
-    svgFilenameCtrl.savedSVGDiagram = 'saved';
-    svgFilenameCtrl.savedSVGDiagram = samplesvg;
+    svgFilenameCtrl.data.savedSvgFileName = 'image.svg';
+    svgFilenameCtrl.savedSvgDiagram = 'saved';
+    svgFilenameCtrl.savedSvgDiagram = samplesvg;
     svgFilenameCtrl.continueDiagramEditing();
     expect(svgFilenameCtrl.diagramStatus).toBe('editing');
   });
@@ -611,10 +785,6 @@ describe('should fail svg tag validation', function() {
   beforeEach(angular.mock.inject(function($componentController) {
     svgFilenameCtrl = $componentController('svgFilenameEditor');
   }));
-
-  afterEach(function() {
-    svgFilenameCtrl.$onDestroy();
-  });
 
   it('should fail svg validation', function() {
     var invalidSvgTag = (
@@ -646,10 +816,6 @@ describe('should fail svg attribute validation', function() {
   beforeEach(angular.mock.inject(function($componentController) {
     svgFilenameCtrl = $componentController('svgFilenameEditor');
   }));
-
-  afterEach(function() {
-    svgFilenameCtrl.$onDestroy();
-  });
 
   it('should fail svg validation', function() {
     var invalidWidthAttribute = (

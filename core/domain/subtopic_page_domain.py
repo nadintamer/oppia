@@ -59,12 +59,14 @@ class SubtopicPageChange(change_domain.BaseChange):
     ALLOWED_COMMANDS = [{
         'name': CMD_CREATE_NEW,
         'required_attribute_names': ['topic_id', 'subtopic_id'],
-        'optional_attribute_names': []
+        'optional_attribute_names': [],
+        'user_id_attribute_names': []
     }, {
         'name': CMD_UPDATE_SUBTOPIC_PAGE_PROPERTY,
         'required_attribute_names': [
             'property_name', 'new_value', 'old_value', 'subtopic_id'],
         'optional_attribute_names': [],
+        'user_id_attribute_names': [],
         'allowed_values': {'property_name': SUBTOPIC_PAGE_PROPERTIES}
     }]
 
@@ -118,7 +120,7 @@ class SubtopicPageContents(python_utils.OBJECT):
         """Returns a dict representing this SubtopicPageContents domain object.
 
         Returns:
-            A dict, mapping all fields of SubtopicPageContents instance.
+            dict. A dict, mapping all fields of SubtopicPageContents instance.
         """
         return {
             'subtitled_html': self.subtitled_html.to_dict(),
@@ -137,9 +139,11 @@ class SubtopicPageContents(python_utils.OBJECT):
         Returns:
             SubtopicPageContents. The corresponding object.
         """
+        page_contents = state_domain.SubtitledHtml.from_dict(
+            page_contents_dict['subtitled_html'])
+        page_contents.validate()
         return cls(
-            state_domain.SubtitledHtml.from_dict(
-                page_contents_dict['subtitled_html']),
+            page_contents,
             state_domain.RecordedVoiceovers.from_dict(page_contents_dict[
                 'recorded_voiceovers']),
             state_domain.WrittenTranslations.from_dict(page_contents_dict[
@@ -176,7 +180,7 @@ class SubtopicPage(python_utils.OBJECT):
         """Returns a dict representing this SubtopicPage domain object.
 
         Returns:
-            A dict, mapping all fields of SubtopicPage instance.
+            dict. A dict, mapping all fields of SubtopicPage instance.
         """
         return {
             'id': self.id,
@@ -310,7 +314,7 @@ class SubtopicPage(python_utils.OBJECT):
         """Validates various properties of the SubtopicPage object.
 
         Raises:
-            ValidationError: One or more attributes of the subtopic page are
+            ValidationError. One or more attributes of the subtopic page are
                 invalid.
         """
         if not isinstance(self.topic_id, python_utils.BASESTRING):

@@ -85,6 +85,15 @@ describe('TrainingDataEditorPanelServiceModalController', function() {
               },
               training_data: ['Answer2']
             }],
+            customization_args: {
+              placeholder: {
+                value: {
+                  content_id: 'ca_placeholder_0',
+                  unicode_str: ''
+                }
+              },
+              rows: { value: 1 }
+            },
             default_outcome: {
               dest: 'Hola',
               feedback: {
@@ -115,7 +124,7 @@ describe('TrainingDataEditorPanelServiceModalController', function() {
             },
           },
           rule_specs: [{
-            type: '',
+            rule_type: '',
             inputs: {
               x: ['c', 'd', 'e'],
               y: ['a', 'b', 'c']
@@ -132,12 +141,13 @@ describe('TrainingDataEditorPanelServiceModalController', function() {
         },
         confirmed_unclassified_answers: [],
         customization_args: {
-          rows: {
-            value: true
-          },
           placeholder: {
-            value: 1
-          }
+            value: {
+              content_id: 'ca_placeholder_0',
+              unicode_str: ''
+            }
+          },
+          rows: { value: 1 }
         },
         hints: [],
       }));
@@ -158,15 +168,16 @@ describe('TrainingDataEditorPanelServiceModalController', function() {
         });
     }));
 
-    it('should evaluate scope variables values correctly', function() {
-      expect($scope.stateName).toBe('Hola');
-      expect($scope.stateContent).toBe('This is Hola State');
-      expect($scope.answerGroupHasNonEmptyRules).toBe(true);
-      expect($scope.inputTemplate).toBe(
-        '<oppia-interactive-text-input last-answer="null"' +
-        ' label-for-focus-target="testInteractionInput">' +
-        '</oppia-interactive-text-input>');
-    });
+    it('should initialize $scope properties after controller is initialized',
+      function() {
+        expect($scope.stateName).toBe('Hola');
+        expect($scope.stateContent).toBe('This is Hola State');
+        expect($scope.answerGroupHasNonEmptyRules).toBe(true);
+        expect($scope.inputTemplate).toBe(
+          '<oppia-interactive-text-input last-answer="null"' +
+          ' label-for-focus-target="testInteractionInput">' +
+          '</oppia-interactive-text-input>');
+      });
 
     it('should call init when controller is initialized', function() {
       expect($scope.trainingData).toEqual([{
@@ -276,6 +287,15 @@ describe('TrainingDataEditorPanelServiceModalController', function() {
               },
               training_data: ['Answer2']
             }],
+            customization_args: {
+              placeholder: {
+                value: {
+                  content_id: 'ca_placeholder_0',
+                  unicode_str: ''
+                }
+              },
+              rows: { value: 1 }
+            },
             default_outcome: {
               dest: 'Hola',
               feedback: {
@@ -321,7 +341,10 @@ describe('TrainingDataEditorPanelServiceModalController', function() {
             value: true
           },
           placeholder: {
-            value: 1
+            value: {
+              content_id: 'ca_placeholder_0',
+              unicode_str: ''
+            }
           }
         },
         hints: [],
@@ -394,6 +417,15 @@ describe('TrainingDataEditorPanelServiceModalController', function() {
               },
               training_data: ['Answer2']
             }],
+            customization_args: {
+              placeholder: {
+                value: {
+                  content_id: 'ca_placeholder_0',
+                  unicode_str: ''
+                }
+              },
+              rows: { value: 1 }
+            },
             default_outcome: {
               dest: 'Hola',
               feedback: {
@@ -435,12 +467,13 @@ describe('TrainingDataEditorPanelServiceModalController', function() {
         },
         confirmed_unclassified_answers: [],
         customization_args: {
-          rows: {
-            value: true
-          },
           placeholder: {
-            value: 1
-          }
+            value: {
+              content_id: 'ca_placeholder_0',
+              unicode_str: ''
+            }
+          },
+          rows: { value: 1 }
         },
         hints: [],
       }));

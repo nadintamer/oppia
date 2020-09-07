@@ -21,9 +21,9 @@ import { Injectable } from '@angular/core';
 
 import { AnswerGroup } from
   'domain/exploration/AnswerGroupObjectFactory';
-import { IWarning, baseInteractionValidationService } from
+import { Warning, baseInteractionValidationService } from
   'interactions/base-interaction-validation.service';
-import { IDragAndDropSortInputCustomizationArgs } from
+import { DragAndDropSortInputCustomizationArgs } from
   'extensions/interactions/customization-args-defs';
 import { Outcome } from
   'domain/exploration/OutcomeObjectFactory';
@@ -39,7 +39,7 @@ export class DragAndDropSortInputValidationService {
         baseInteractionValidationService) {}
 
   getCustomizationArgsWarnings(
-      customizationArgs: IDragAndDropSortInputCustomizationArgs): IWarning[] {
+      customizationArgs: DragAndDropSortInputCustomizationArgs): Warning[] {
     var warningsList = [];
 
     this.baseInteractionValidationServiceInstance.requireCustomizationArguments(
@@ -58,7 +58,7 @@ export class DragAndDropSortInputValidationService {
     }
 
     for (var i = 0; i < numChoices; i++) {
-      var choice = customizationArgs.choices.value[i];
+      var choice = customizationArgs.choices.value[i].getHtml();
       if (choice.trim().length === 0) {
         areAnyChoicesEmpty = true;
       }
@@ -87,8 +87,8 @@ export class DragAndDropSortInputValidationService {
 
   getAllWarnings(
       stateName: string,
-      customizationArgs: IDragAndDropSortInputCustomizationArgs,
-      answerGroups: AnswerGroup[], defaultOutcome: Outcome): IWarning[] {
+      customizationArgs: DragAndDropSortInputCustomizationArgs,
+      answerGroups: AnswerGroup[], defaultOutcome: Outcome): Warning[] {
     var warningsList = [];
     var seenItems = [];
     var ranges = [];
@@ -137,16 +137,18 @@ export class DragAndDropSortInputValidationService {
           }
         }
         var range = {
-          answerGroupIndex: i + 1,
-          ruleIndex: j + 1
+          answerGroupIndex: i,
+          ruleIndex: j
         };
         seenItems = [];
         areAnyItemsEmpty = false;
         areAnyItemsDuplicated = false;
 
+        let choiceValues = (
+          customizationArgs.choices.value.map(x => x.getHtml()));
         switch (rule.type) {
           case 'HasElementXAtPositionY':
-            if (!customizationArgs.choices.value.includes(<string>inputs.x)) {
+            if (!choiceValues.includes(<string>inputs.x)) {
               warningsList.push({
                 type: AppConstants.WARNING_TYPES.ERROR,
                 message: (
@@ -175,8 +177,8 @@ export class DragAndDropSortInputValidationService {
               });
             }
             if (
-              !customizationArgs.choices.value.includes(<string>inputs.x) ||
-              !customizationArgs.choices.value.includes(<string>inputs.y)) {
+              !choiceValues.includes(<string>inputs.x) ||
+              !choiceValues.includes(<string>inputs.y)) {
               warningsList.push({
                 type: AppConstants.WARNING_TYPES.ERROR,
                 message: (
@@ -233,8 +235,7 @@ export class DragAndDropSortInputValidationService {
                   'elements cannot occupy the same position.')
               });
             }
-            var sortedCustomArgsChoices = (
-              customizationArgs.choices.value.sort());
+            var sortedCustomArgsChoices = choiceValues.sort();
             var flattenedAndSortedXInputs = (
               xInputs.reduce((acc, val) => acc.concat(val), []).sort());
             if (
@@ -252,8 +253,8 @@ export class DragAndDropSortInputValidationService {
         }
 
         for (var k = 0; k < ranges.length; k++) {
-          var earlierRule = answerGroups[ranges[k].answerGroupIndex - 1].
-            rules[ranges[k].ruleIndex - 1];
+          var earlierRule = answerGroups[ranges[k].answerGroupIndex].
+            rules[ranges[k].ruleIndex];
           if (earlierRule.type ===
             'IsEqualToOrderingWithOneItemAtIncorrectPosition' &&
             rule.type === 'IsEqualToOrdering') {
@@ -263,8 +264,8 @@ export class DragAndDropSortInputValidationService {
                 message: (
                   `Rule ${(j + 1)} from answer group ${(i + 1)} ` +
                   'will never be matched because it is made redundant by ' +
-                  `rule ${ranges[k].ruleIndex} from answer group ` +
-                  `${ranges[k].answerGroupIndex}.`)
+                  `rule ${ranges[k].ruleIndex + 1} from answer group ` +
+                  `${ranges[k].answerGroupIndex + 1}.`)
               });
             }
           }

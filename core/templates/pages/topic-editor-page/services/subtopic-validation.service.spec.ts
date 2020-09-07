@@ -34,21 +34,22 @@ describe('Subtopic validation service', function() {
 
   var TopicObjectFactory = null;
   var TopicEditorStateService = null;
-  var EntityCreationService = null;
   var SubtopicValidationService = null;
   var SubtopicObjectFactory = null;
 
   beforeEach(angular.mock.inject(function($injector) {
     TopicEditorStateService = $injector.get('TopicEditorStateService');
     SubtopicObjectFactory = $injector.get('SubtopicObjectFactory');
-    EntityCreationService = $injector.get('EntityCreationService');
     TopicObjectFactory = $injector.get('TopicObjectFactory');
     SubtopicValidationService = $injector.get('SubtopicValidationService');
 
     var topic = TopicObjectFactory.createInterstitialTopic();
     var subtopic1 = SubtopicObjectFactory.createFromTitle(1, 'Subtopic1');
+    subtopic1.setUrlFragment('subtopic-one');
     var subtopic2 = SubtopicObjectFactory.createFromTitle(1, 'Subtopic2');
+    subtopic2.setUrlFragment('subtopic-two');
     var subtopic3 = SubtopicObjectFactory.createFromTitle(1, 'Subtopic3');
+    subtopic3.setUrlFragment('subtopic-three');
     topic.getSubtopics = function() {
       return [subtopic1, subtopic2, subtopic3];
     };
@@ -66,5 +67,18 @@ describe('Subtopic validation service', function() {
       'Subtopic3')).toEqual(false);
     expect(SubtopicValidationService.checkValidSubtopicName(
       'Subtopic4')).toEqual(true);
+  });
+
+  it('should validate if subtopic with url fragment exists', function() {
+    expect(SubtopicValidationService.doesSubtopicWithUrlFragmentExist(
+      'random-name')).toEqual(false);
+    expect(SubtopicValidationService.doesSubtopicWithUrlFragmentExist(
+      'subtopic-one')).toEqual(true);
+    expect(SubtopicValidationService.doesSubtopicWithUrlFragmentExist(
+      'subtopic-two')).toEqual(true);
+    expect(SubtopicValidationService.doesSubtopicWithUrlFragmentExist(
+      'subtopic-three')).toEqual(true);
+    expect(SubtopicValidationService.doesSubtopicWithUrlFragmentExist(
+      'subtopic-four')).toEqual(false);
   });
 });

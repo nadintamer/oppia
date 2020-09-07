@@ -61,6 +61,10 @@ ISSUES_DIR = (
     os.path.join(EXTENSIONS_DIR_PREFIX, 'extensions', 'issues'))
 INTERACTIONS_DIR = (
     os.path.join('extensions', 'interactions'))
+INTERACTIONS_LEGACY_SPECS_FILE_DIR = (
+    os.path.join(INTERACTIONS_DIR, 'legacy_interaction_specs'))
+INTERACTIONS_SPECS_FILE_PATH = (
+    os.path.join(INTERACTIONS_DIR, 'interaction_specs.json'))
 RTE_EXTENSIONS_DIR = (
     os.path.join(EXTENSIONS_DIR_PREFIX, 'extensions', 'rich_text_components'))
 RTE_EXTENSIONS_DEFINITIONS_PATH = (
@@ -162,6 +166,9 @@ ENTITY_TYPE_STORY = 'story'
 ENTITY_TYPE_QUESTION = 'question'
 ENTITY_TYPE_VOICEOVER_APPLICATION = 'voiceover_application'
 
+IMAGE_CONTEXT_QUESTION_SUGGESTIONS = 'question_suggestions'
+IMAGE_CONTEXT_EXPLORATION_SUGGESTIONS = 'exploration_suggestions'
+
 MAX_TASK_MODELS_PER_FETCH = 25
 MAX_TASK_MODELS_PER_HISTORY_PAGE = 10
 
@@ -206,7 +213,7 @@ CURRENT_DASHBOARD_STATS_SCHEMA_VERSION = 1
 # incompatible changes are made to the states blob schema in the data store,
 # this version number must be changed and the exploration migration job
 # executed.
-CURRENT_STATE_SCHEMA_VERSION = 34
+CURRENT_STATE_SCHEMA_VERSION = 38
 
 # The current version of the all collection blob schemas (such as the nodes
 # structure within the Collection domain object). If any backward-incompatible
@@ -227,7 +234,7 @@ CURRENT_MISCONCEPTIONS_SCHEMA_VERSION = 3
 CURRENT_RUBRIC_SCHEMA_VERSION = 3
 
 # The current version of subtopics dict in the topic schema.
-CURRENT_SUBTOPIC_SCHEMA_VERSION = 2
+CURRENT_SUBTOPIC_SCHEMA_VERSION = 3
 
 # The current version of story reference dict in the topic schema.
 CURRENT_STORY_REFERENCE_SCHEMA_VERSION = 1
@@ -243,6 +250,10 @@ CURRENT_STATE_ANSWERS_SCHEMA_VERSION = 1
 # dict schema changes.
 CURRENT_LEARNER_ANSWER_INFO_SCHEMA_VERSION = 1
 
+# This value should be updated if the schema of PlatformParameterRule dict
+# schema changes.
+CURRENT_PLATFORM_PARAMETER_RULE_SCHEMA_VERSION = 1
+
 # The default number of exploration tiles to load at a time in the search
 # results page.
 SEARCH_RESULTS_PAGE_SIZE = 20
@@ -255,7 +266,7 @@ COMMIT_LIST_PAGE_SIZE = 50
 # tab.
 FEEDBACK_TAB_PAGE_SIZE = 20
 
-# The default number of opportunities to show on community dashboard page.
+# The default number of opportunities to show on contributor dashboard page.
 OPPORTUNITIES_PAGE_SIZE = 20
 
 # The maximum number of top unresolved answers which should be aggregated
@@ -386,18 +397,22 @@ def get_empty_ratings():
 # Empty scaled average rating as a float.
 EMPTY_SCALED_AVERAGE_RATING = 0.0
 
-# To use GAE email service.
-EMAIL_SERVICE_PROVIDER_GAE = 'gae_email_service'
 # To use mailgun email service.
 EMAIL_SERVICE_PROVIDER_MAILGUN = 'mailgun_email_service'
 # Use GAE email service by default.
-EMAIL_SERVICE_PROVIDER = EMAIL_SERVICE_PROVIDER_GAE
+EMAIL_SERVICE_PROVIDER = EMAIL_SERVICE_PROVIDER_MAILGUN
 # If the Mailgun email API is used, the "None" below should be replaced
 # with the Mailgun API key.
 MAILGUN_API_KEY = None
 # If the Mailgun email API is used, the "None" below should be replaced
 # with the Mailgun domain name (ending with mailgun.org).
 MAILGUN_DOMAIN_NAME = None
+
+# Replace this with the correct Redis Host and Port when switching to prod
+# server. Keep this in sync with redis.conf in the root folder. Specifically,
+# REDISPORT should always be the same as the port in redis.conf.
+REDISHOST = 'localhost'
+REDISPORT = 6379
 
 # Committer id for system actions. The username for the system committer
 # (i.e. admin) is also 'admin'.
@@ -454,8 +469,8 @@ AVERAGE_RATINGS_DASHBOARD_PRECISION = 2
 # database by non-admins.
 ENABLE_MAINTENANCE_MODE = False
 
-# Whether community dashboard is ready to use for contributors.
-COMMUNITY_DASHBOARD_ENABLED = False
+# Whether contributor dashboard is ready to use for contributors.
+CONTRIBUTOR_DASHBOARD_ENABLED = False
 
 # The interactions permissible for a question.
 ALLOWED_QUESTION_INTERACTION_IDS = [
@@ -472,8 +487,8 @@ ENABLE_RECORDING_OF_SCORES = False
 # No. of pretest questions to display.
 NUM_PRETEST_QUESTIONS = 3
 
-# Whether to automatically accept suggestions after a threshold time.
-ENABLE_AUTO_ACCEPT_OF_SUGGESTIONS = False
+# Maximum allowed commit message length for SnapshotMetadata models.
+MAX_COMMIT_MESSAGE_LENGTH = 1000
 
 EMAIL_INTENT_SIGNUP = 'signup'
 EMAIL_INTENT_DAILY_BATCH = 'daily_batch'
@@ -529,6 +544,10 @@ REGISTRATION_PAGE_LAST_UPDATED_UTC = datetime.datetime(2015, 10, 14, 2, 40, 0)
 # NOTE TO DEVELOPERS: This format should not be changed, since it is used in
 # the existing storage models for UserStatsModel.
 DASHBOARD_STATS_DATETIME_STRING_FORMAT = '%Y-%m-%d'
+
+# We generate images for existing math rich text components in batches. This
+# gives the maximum size for a batch of Math SVGs in bytes.
+MAX_SIZE_OF_MATH_SVGS_BATCH_BYTES = 31 * 1024 * 1024
 
 # The maximum size of an uploaded file, in bytes.
 MAX_FILE_SIZE_BYTES = 1048576
@@ -680,9 +699,9 @@ COLLECTION_PUBLISH_PREFIX = '/collection_editor_handler/publish'
 COLLECTION_UNPUBLISH_PREFIX = '/collection_editor_handler/unpublish'
 COLLECTION_EDITOR_URL_PREFIX = '/collection_editor/create'
 COLLECTION_URL_PREFIX = '/collection'
-COMMUNITY_OPPORTUNITIES_DATA_URL = '/opportunitiessummaryhandler'
-COMMUNITY_DASHBOARD_URL = '/community-dashboard'
 CONCEPT_CARD_DATA_URL_PREFIX = '/concept_card_handler'
+CONTRIBUTOR_DASHBOARD_URL = '/contributor-dashboard'
+CONTRIBUTOR_OPPORTUNITIES_DATA_URL = '/opportunitiessummaryhandler'
 CREATOR_DASHBOARD_DATA_URL = '/creatordashboardhandler/data'
 CREATOR_DASHBOARD_URL = '/creator-dashboard'
 CSRF_HANDLER_URL = '/csrfhandler'
@@ -716,6 +735,7 @@ FLAG_EXPLORATION_URL_PREFIX = '/flagexplorationhandler'
 FRACTIONS_LANDING_PAGE_URL = '/fractions'
 IMPROVEMENTS_URL_PREFIX = '/improvements'
 IMPROVEMENTS_HISTORY_URL_PREFIX = '/improvements/history'
+IMPROVEMENTS_CONFIG_URL_PREFIX = '/improvements/config'
 LEARNER_ANSWER_INFO_HANDLER_URL = (
     '/learneranswerinfohandler/learner_answer_details')
 LEARNER_ANSWER_DETAILS_SUBMIT_URL = '/learneranswerdetailshandler'
@@ -748,6 +768,7 @@ PREFERENCES_DATA_URL = '/preferenceshandler/data'
 QUESTION_EDITOR_DATA_URL_PREFIX = '/question_editor_handler/data'
 QUESTION_SKILL_LINK_URL_PREFIX = '/manage_question_skill_link'
 QUESTIONS_LIST_URL_PREFIX = '/questions_list_handler'
+QUESTION_COUNT_URL_PREFIX = '/question_count_handler'
 QUESTIONS_URL_PREFIX = '/question_player_handler'
 RECENT_COMMITS_DATA_URL = '/recentcommitshandler/recent_commits'
 RECENT_FEEDBACK_MESSAGES_DATA_URL = '/recent_feedback_messages'
@@ -773,6 +794,7 @@ STORY_EDITOR_URL_PREFIX = '/story_editor'
 STORY_EDITOR_DATA_URL_PREFIX = '/story_editor_handler/data'
 STORY_PROGRESS_URL_PREFIX = '/story_progress_handler'
 STORY_PUBLISH_HANDLER = '/story_publish_handler'
+STORY_URL_FRAGMENT_HANDLER = '/story_url_fragment_handler'
 STORY_VIEWER_URL_PREFIX = '/story'
 SUBTOPIC_DATA_HANDLER = '/subtopic_data_handler'
 SUBTOPIC_VIEWER_URL_PREFIX = '/subtopic'
@@ -781,14 +803,18 @@ SUGGESTION_LIST_URL_PREFIX = '/suggestionlisthandler'
 SUGGESTION_URL_PREFIX = '/suggestionhandler'
 SUBSCRIBE_URL_PREFIX = '/subscribehandler'
 SUBTOPIC_PAGE_EDITOR_DATA_URL_PREFIX = '/subtopic_page_editor_handler/data'
-TOPIC_VIEWER_URL_PREFIX = '/topic'
+TOPIC_VIEWER_URL_PREFIX = (
+    '/learn/<classroom_url_fragment>/<topic_url_fragment>')
 TOPIC_DATA_HANDLER = '/topic_data_handler'
 TOPIC_EDITOR_DATA_URL_PREFIX = '/topic_editor_handler/data'
 TOPIC_EDITOR_URL_PREFIX = '/topic_editor'
+TOPIC_NAME_HANDLER = '/topic_name_handler'
 TOPIC_RIGHTS_URL_PREFIX = '/rightshandler/get_topic_rights'
 TOPIC_SEND_MAIL_URL_PREFIX = '/rightshandler/send_topic_publish_mail'
 TOPIC_STATUS_URL_PREFIX = '/rightshandler/change_topic_status'
+TOPIC_URL_FRAGMENT_HANDLER = '/topic_url_fragment_handler'
 TOPICS_AND_SKILLS_DASHBOARD_DATA_URL = '/topics_and_skills_dashboard/data'
+UNASSIGN_SKILL_DATA_HANDLER_URL = '/topics_and_skills_dashboard/unassign_skill'
 TOPICS_AND_SKILLS_DASHBOARD_URL = '/topics-and-skills-dashboard'
 UNSUBSCRIBE_URL_PREFIX = '/unsubscribehandler'
 UPLOAD_EXPLORATION_URL = '/contributehandler/upload'
@@ -904,6 +930,7 @@ HANDLER_TYPE_DOWNLOADABLE = 'downloadable'
 # Following are the constants for the role IDs.
 ROLE_ID_GUEST = 'GUEST'
 ROLE_ID_BANNED_USER = 'BANNED_USER'
+ROLE_ID_LEARNER = 'LEARNER'
 ROLE_ID_EXPLORATION_EDITOR = 'EXPLORATION_EDITOR'
 ROLE_ID_COLLECTION_EDITOR = 'COLLECTION_EDITOR'
 ROLE_ID_TOPIC_MANAGER = 'TOPIC_MANAGER'
@@ -1026,5 +1053,160 @@ AVAILABLE_LANDING_PAGES = {
 }
 
 # Classroom page names for generating URLs. These need to be kept in sync with
-# TOPIC_IDS_FOR_CLASSROOM_PAGES property in config_domain.
+# CLASSROOM_PAGES_DATA property in config_domain.
 CLASSROOM_PAGES = ['math']
+
+# Authentication method using GAE ID (google sign in).
+AUTH_METHOD_GAE = 'gae'
+
+# TODO(#10501): Once domain objects can be imported by the storage layer, move
+# these back to appropriate places (rights_domain, topic_domain).
+# The reserved prefix for keys that are automatically inserted into a
+# commit_cmd dict by this model.
+AUTOGENERATED_PREFIX = 'AUTO'
+
+# The command string for a revert commit.
+CMD_REVERT_COMMIT = '%s_revert_version_number' % AUTOGENERATED_PREFIX
+
+# The command string for a delete commit.
+CMD_DELETE_COMMIT = '%s_mark_deleted' % AUTOGENERATED_PREFIX
+
+# IMPORTANT: Ensure that all changes to how these cmds are interpreted preserve
+# backward-compatibility with previous exploration snapshots in the datastore.
+# Do not modify the definitions of CMD keys that already exist.
+CMD_CREATE_NEW = 'create_new'
+CMD_CHANGE_ROLE = 'change_role'
+CMD_CHANGE_EXPLORATION_STATUS = 'change_exploration_status'
+CMD_CHANGE_COLLECTION_STATUS = 'change_collection_status'
+CMD_CHANGE_PRIVATE_VIEWABILITY = 'change_private_viewability'
+CMD_RELEASE_OWNERSHIP = 'release_ownership'
+CMD_UPDATE_FIRST_PUBLISHED_MSEC = 'update_first_published_msec'
+
+# Roles used in collections and explorations.
+ROLE_OWNER = 'owner'
+ROLE_EDITOR = 'editor'
+ROLE_VOICE_ARTIST = 'voice artist'
+ROLE_VIEWER = 'viewer'
+ROLE_NONE = 'none'
+
+# The allowed list of roles which can be used in change_role command.
+ALLOWED_ACTIVITY_ROLES = [
+    ROLE_OWNER, ROLE_EDITOR, ROLE_VOICE_ARTIST, ROLE_VIEWER]
+
+# The allowed list of status which can be used in change_exploration_status
+# and change_collection_status commands.
+ALLOWED_ACTIVITY_STATUS = [
+    constants.ACTIVITY_STATUS_PRIVATE, constants.ACTIVITY_STATUS_PUBLIC]
+
+# Commands allowed in CollectionRightsChange and ExplorationRightsChange.
+COMMON_RIGHTS_ALLOWED_COMMANDS = [{
+    'name': CMD_CREATE_NEW,
+    'required_attribute_names': [],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': []
+}, {
+    'name': CMD_CHANGE_ROLE,
+    'required_attribute_names': ['assignee_id', 'old_role', 'new_role'],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': ['assignee_id'],
+    'allowed_values': {
+        'new_role': ALLOWED_ACTIVITY_ROLES, 'old_role': ALLOWED_ACTIVITY_ROLES}
+}, {
+    'name': CMD_CHANGE_PRIVATE_VIEWABILITY,
+    'required_attribute_names': [
+        'old_viewable_if_private', 'new_viewable_if_private'],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': []
+}, {
+    'name': CMD_RELEASE_OWNERSHIP,
+    'required_attribute_names': [],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': []
+}, {
+    'name': CMD_UPDATE_FIRST_PUBLISHED_MSEC,
+    'required_attribute_names': [
+        'old_first_published_msec', 'new_first_published_msec'],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': []
+}, {
+    'name': CMD_DELETE_COMMIT,
+    'required_attribute_names': [],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': []
+}]
+
+COLLECTION_RIGHTS_CHANGE_ALLOWED_COMMANDS = copy.deepcopy(
+    COMMON_RIGHTS_ALLOWED_COMMANDS)
+COLLECTION_RIGHTS_CHANGE_ALLOWED_COMMANDS.append({
+    'name': CMD_CHANGE_COLLECTION_STATUS,
+    'required_attribute_names': ['old_status', 'new_status'],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': [],
+    'allowed_values': {
+        'old_status': ALLOWED_ACTIVITY_STATUS,
+        'new_status': ALLOWED_ACTIVITY_STATUS
+    }
+})
+
+EXPLORATION_RIGHTS_CHANGE_ALLOWED_COMMANDS = copy.deepcopy(
+    COMMON_RIGHTS_ALLOWED_COMMANDS)
+EXPLORATION_RIGHTS_CHANGE_ALLOWED_COMMANDS.append({
+    'name': CMD_CHANGE_EXPLORATION_STATUS,
+    'required_attribute_names': ['old_status', 'new_status'],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': [],
+    'allowed_values': {
+        'old_status': ALLOWED_ACTIVITY_STATUS,
+        'new_status': ALLOWED_ACTIVITY_STATUS
+    }
+})
+
+CMD_REMOVE_MANAGER_ROLE = 'remove_manager_role'
+CMD_PUBLISH_TOPIC = 'publish_topic'
+CMD_UNPUBLISH_TOPIC = 'unpublish_topic'
+
+ROLE_MANAGER = 'manager'
+
+# The allowed list of roles which can be used in TopicRightsChange change_role
+# command.
+ALLOWED_TOPIC_ROLES = [ROLE_NONE, ROLE_MANAGER]
+
+# Commands allowed in TopicRightsChange.
+TOPIC_RIGHTS_CHANGE_ALLOWED_COMMANDS = [{
+    'name': CMD_CREATE_NEW,
+    'required_attribute_names': [],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': []
+}, {
+    'name': CMD_CHANGE_ROLE,
+    'required_attribute_names': ['assignee_id', 'new_role', 'old_role'],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': ['assignee_id'],
+    'allowed_values': {
+        'new_role': ALLOWED_TOPIC_ROLES, 'old_role': ALLOWED_TOPIC_ROLES
+    }
+}, {
+    'name': CMD_REMOVE_MANAGER_ROLE,
+    'required_attribute_names': ['removed_user_id'],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': ['removed_user_id']
+}, {
+    'name': CMD_PUBLISH_TOPIC,
+    'required_attribute_names': [],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': []
+}, {
+    'name': CMD_UNPUBLISH_TOPIC,
+    'required_attribute_names': [],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': []
+}, {
+    'name': CMD_DELETE_COMMIT,
+    'required_attribute_names': [],
+    'optional_attribute_names': [],
+    'user_id_attribute_names': []
+}]
+
+# Length of user PIN for different roles used on Android.
+FULL_USER_PIN_LENGTH = 5
+PROFILE_USER_PIN_LENGTH = 3

@@ -36,12 +36,13 @@ import { TextInputTokenizer } from 'classifiers/text-input.tokenizer';
 export class TextInputPredictionService {
   private TEXT_INPUT_PREDICTION_SERVICE_THRESHOLD = (
     InteractionsExtensionsConstants.TEXT_INPUT_PREDICTION_SERVICE_THRESHOLD);
-  constructor(private countVectorizerService: CountVectorizerService,
-      private svmPredictionService: SVMPredictionService,
-      private textInputTokenizer: TextInputTokenizer) {
+  constructor(
+    private countVectorizerService: CountVectorizerService,
+    private svmPredictionService: SVMPredictionService,
+    private textInputTokenizer: TextInputTokenizer) {
   }
 
-  predict(classifierData: ITextInputClassifierData, textInput: string): number {
+  predict(classifierData: TextInputClassifierData, textInput: string): number {
     const cvVocabulary = classifierData.cv_vocabulary;
     const svmData = classifierData.SVM;
 

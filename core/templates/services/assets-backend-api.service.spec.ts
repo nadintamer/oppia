@@ -37,7 +37,6 @@ require('services/csrf-token.service.ts');
 describe('Assets Backend API Service', function() {
   describe('on dev mode', function() {
     var AssetsBackendApiService = null;
-    var fileDownloadRequestObjectFactory = null;
     var UrlInterpolationService = null;
     var audioFileObjectFactory = null;
     var imageFileObjectFactory = null;
@@ -67,8 +66,6 @@ describe('Assets Backend API Service', function() {
     beforeEach(angular.mock.inject(function($injector) {
       AssetsBackendApiService = $injector.get(
         'AssetsBackendApiService');
-      fileDownloadRequestObjectFactory = $injector.get(
-        'FileDownloadRequestObjectFactory');
       audioFileObjectFactory = $injector.get('AudioFileObjectFactory');
       imageFileObjectFactory = $injector.get('ImageFileObjectFactory');
       UrlInterpolationService = $injector.get(
@@ -139,11 +136,13 @@ describe('Assets Backend API Service', function() {
 
       AssetsBackendApiService.loadAudio('0', 'myfile.mp3').then(
         successHandler, failHandler);
-      expect((AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
-        .audio.length).toBe(1);
+      expect(
+        (AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
+          .audio.length).toBe(1);
       $httpBackend.flush();
-      expect((AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
-        .audio.length).toBe(0);
+      expect(
+        (AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
+          .audio.length).toBe(0);
       expect(AssetsBackendApiService.isCached('myfile.mp3')).toBe(true);
       expect(successHandler).toHaveBeenCalled();
       expect(failHandler).not.toHaveBeenCalled();
@@ -194,8 +193,11 @@ describe('Assets Backend API Service', function() {
 
     it('should successfully save an audio', function(done) {
       var successMessage = 'Audio was successfully saved.';
-      // @ts-ignore in order to ignore JQuery properties that should
-      // be declarated.
+      // This throws "Argument of type '() => Promise<any, any, any>' is not
+      // assignable to parameter of type '{ (url: string, ...):
+      // jqXHR<any>; ...}'.". We need to suppress this error because we need
+      // to mock $.ajax to this function for testing purposes.
+      // @ts-expect-error
       spyOn($, 'ajax').and.callFake(function() {
         var d = $.Deferred();
         d.resolve(successMessage);
@@ -214,8 +216,11 @@ describe('Assets Backend API Service', function() {
 
     it('should successfully save a math SVG', function(done) {
       var successMessage = 'Math SVG was successfully saved.';
-      // @ts-ignore in order to ignore JQuery properties that should
-      // be declarated.
+      // This throws "Argument of type '() => Promise<any, any, any>' is not
+      // assignable to parameter of type '{ (url: string, ...):
+      // jqXHR<any>; ...}'.". We need to suppress this error because we need
+      // to mock $.ajax to this function for testing purposes.
+      // @ts-expect-error
       spyOn($, 'ajax').and.callFake(function() {
         var d = $.Deferred();
         d.resolve(successMessage);
@@ -227,8 +232,11 @@ describe('Assets Backend API Service', function() {
         .then(function(response) {
           // Below checks assert that the correct data is sent to the backend.
           var dataArguementForAjaxCall = (
-            // @ts-ignore in order to ignore JQuery properties that should
-            // be declarated.
+            // This throws "Property 'calls' does not exist on type
+            // '{ (url: string, ...): jqXHR<any>; ... }'." This is because
+            // $.ajax is not the actual $.ajax, it is the mocked to the function
+            // which has this property. We did this for testing purposes.
+            // @ts-expect-error
             $.ajax.calls.mostRecent().args[0].data);
           expect(dataArguementForAjaxCall instanceof FormData).toBeTruthy();
           var rawImageSentToBackend = null;
@@ -255,8 +263,11 @@ describe('Assets Backend API Service', function() {
 
     it('should handle rejection when saving a math SVG fails ', function(done) {
       var errorMessage = 'Math SVG was not successfully saved.';
-      // @ts-ignore in order to ignore JQuery properties that should
-      // be declarated.
+      // This throws "Argument of type '() => Promise<any, any, any>' is not
+      // assignable to parameter of type '{ (url: string, ...):
+      // jqXHR<any>; ...}'.". We need to suppress this error because we need
+      // to mock $.ajax to this function for testing purposes.
+      // @ts-expect-error
       spyOn($, 'ajax').and.callFake(function() {
         var d = $.Deferred();
         d.reject({
@@ -286,8 +297,11 @@ describe('Assets Backend API Service', function() {
 
     it('should handle rejection when saving a file fails', function(done) {
       var errorMessage = 'Error on saving audio';
-      // @ts-ignore in order to ignore JQuery properties that should
-      // be declarated.
+      // This throws "Argument of type '() => Promise<any, any, any>' is not
+      // assignable to parameter of type '{ (url: string, ...):
+      // jqXHR<any>; ...}'.". We need to suppress this error because we need
+      // to mock $.ajax to this function for testing purposes.
+      // @ts-expect-error
       spyOn($, 'ajax').and.callFake(function() {
         var d = $.Deferred();
         d.reject({
@@ -325,11 +339,13 @@ describe('Assets Backend API Service', function() {
       AssetsBackendApiService.loadImage(
         ENTITY_TYPE.EXPLORATION, '0', 'myfile.png').then(
         successHandler, failHandler);
-      expect((AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
-        .image.length).toBe(1);
+      expect(
+        (AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
+          .image.length).toBe(1);
       $httpBackend.flush();
-      expect((AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
-        .image.length).toBe(0);
+      expect(
+        (AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
+          .image.length).toBe(0);
       expect(AssetsBackendApiService.isCached('myfile.png')).toBe(true);
       expect(successHandler).toHaveBeenCalled();
       expect(failHandler).not.toHaveBeenCalled();
@@ -405,13 +421,15 @@ describe('Assets Backend API Service', function() {
         AssetsBackendApiService.loadAudio('0', 'myfile.mp3').then(
           successHandler, failHandler);
 
-        expect(AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested()
-          .audio.length).toBe(1);
+        expect(
+          AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested()
+            .audio.length).toBe(1);
 
         AssetsBackendApiService.abortAllCurrentAudioDownloads();
         $httpBackend.verifyNoOutstandingRequest();
-        expect(AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested()
-          .audio.length).toBe(0);
+        expect(
+          AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested()
+            .audio.length).toBe(0);
         expect(AssetsBackendApiService.isCached('myfile.mp3')).toBe(false);
       });
 
@@ -426,13 +444,15 @@ describe('Assets Backend API Service', function() {
           ENTITY_TYPE.EXPLORATION, '0', 'myfile.png').then(
           successHandler, failHandler);
 
-        expect(AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested()
-          .image.length).toBe(1);
+        expect(
+          AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested()
+            .image.length).toBe(1);
 
         AssetsBackendApiService.abortAllCurrentImageDownloads();
         $httpBackend.verifyNoOutstandingRequest();
-        expect(AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested()
-          .image.length).toBe(0);
+        expect(
+          AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested()
+            .image.length).toBe(0);
         expect(AssetsBackendApiService.isCached('myfile.png')).toBe(false);
       });
 
@@ -444,11 +464,13 @@ describe('Assets Backend API Service', function() {
         201, {type: 'audio/mpeg'});
       AssetsBackendApiService.loadAudio('0', 'myfile.mp3').then(
         successHandler, failHandler);
-      expect((AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
-        .audio.length).toBe(1);
+      expect(
+        (AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
+          .audio.length).toBe(1);
       $httpBackend.flush();
-      expect((AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
-        .audio.length).toBe(0);
+      expect(
+        (AssetsBackendApiService.getAssetsFilesCurrentlyBeingRequested())
+          .audio.length).toBe(0);
 
       expect(successHandler).toHaveBeenCalled();
       expect(failHandler).not.toHaveBeenCalled();
@@ -479,7 +501,7 @@ describe('Assets Backend API Service', function() {
       ' Service bucket name is not set', angular.mock.inject(
       function($injector) {
         expect(function() {
-          var service = $injector.get(
+          $injector.get(
             'AssetsBackendApiService');
         }).toThrowError('GCS_RESOURCE_BUCKET_NAME is not set in prod.');
       }));
@@ -516,8 +538,8 @@ describe('Assets Backend API Service', function() {
       expect(
         AssetsBackendApiService.getAudioDownloadUrl(
           ENTITY_TYPE.EXPLORATION, 'expid12345', 'a.mp3')
-      ).toEqual(gcsPrefix +
-        '/exploration/expid12345/assets/audio/a.mp3');
+      ).toEqual(
+        gcsPrefix + '/exploration/expid12345/assets/audio/a.mp3');
     });
 
     it('should correctly formulate the preview URL for images', function() {
@@ -531,8 +553,8 @@ describe('Assets Backend API Service', function() {
       expect(
         AssetsBackendApiService.getThumbnailUrlForPreview(
           ENTITY_TYPE.EXPLORATION, 'expid12345', 'thumbnail.png')
-      ).toEqual(gcsPrefix +
-        '/exploration/expid12345/assets/thumbnail/thumbnail.png');
+      ).toEqual(
+        gcsPrefix + '/exploration/expid12345/assets/thumbnail/thumbnail.png');
     });
   });
 });

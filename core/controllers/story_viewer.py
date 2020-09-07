@@ -25,6 +25,7 @@ from core.domain import skill_fetchers
 from core.domain import story_fetchers
 from core.domain import story_services
 from core.domain import summary_services
+from core.domain import topic_fetchers
 import feconf
 
 
@@ -34,9 +35,6 @@ class StoryPage(base.BaseHandler):
     @acl_decorators.can_access_story_viewer_page
     def get(self, _):
         """Handles GET requests."""
-        if not constants.ENABLE_NEW_STRUCTURE_PLAYERS:
-            raise self.PageNotFoundException
-
         self.render_template('story-viewer-page.mainpage.html')
 
 
@@ -50,10 +48,9 @@ class StoryPageDataHandler(base.BaseHandler):
     @acl_decorators.can_access_story_viewer_page
     def get(self, story_id):
         """Handles GET requests."""
-        if not constants.ENABLE_NEW_STRUCTURE_PLAYERS:
-            raise self.PageNotFoundException
-
         story = story_fetchers.get_story_by_id(story_id)
+        topic_id = story.corresponding_topic_id
+        topic_name = topic_fetchers.get_topic_by_id(topic_id).name
 
         completed_node_ids = [
             completed_node.id for completed_node in
@@ -77,9 +74,11 @@ class StoryPageDataHandler(base.BaseHandler):
             node['exp_summary_dict'] = exp_summary_dicts[ind]
 
         self.values.update({
+            'story_id': story.id,
             'story_title': story.title,
             'story_description': story.description,
-            'story_nodes': ordered_node_dicts
+            'story_nodes': ordered_node_dicts,
+            'topic_name': topic_name
         })
         self.render_json(self.values)
 

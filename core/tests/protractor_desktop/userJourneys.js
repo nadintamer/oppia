@@ -23,8 +23,6 @@ var CreatorDashboardPage =
   require('../protractor_utils/CreatorDashboardPage.js');
 var ExplorationEditorPage = require(
   '../protractor_utils/ExplorationEditorPage.js');
-var ExplorationPlayerPage = require(
-  '../protractor_utils/ExplorationPlayerPage.js');
 var LibraryPage = require('../protractor_utils/LibraryPage.js');
 var PreferencesPage = require('../protractor_utils/PreferencesPage.js');
 var forms = require('../protractor_utils/forms.js');
@@ -69,11 +67,7 @@ describe('Basic user journeys', function() {
 
       await users.login('mod@userManagement.com');
       await browser.get(general.MODERATOR_URL_SUFFIX);
-      var profileDropdown = element(
-        by.css('.protractor-test-profile-dropdown'));
-      await waitFor.elementToBeClickable(
-        profileDropdown, 'Could not click profile dropdown');
-      await profileDropdown.click();
+      await general.openProfileDropdown();
       await users.logout();
       await general.checkForConsoleErrors([]);
     });

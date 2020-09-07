@@ -17,7 +17,6 @@
  * in Protractor tests.
  */
 
-var forms = require('./forms.js');
 var waitFor = require('./waitFor.js');
 
 var ClassroomPage = function() {
@@ -25,7 +24,7 @@ var ClassroomPage = function() {
     by.css('.protractor-test-topic-summary-tile'));
 
   this.get = async function(classroomName) {
-    await browser.get('/' + classroomName);
+    await browser.get('/learn/' + classroomName);
     await waitFor.pageToFullyLoad();
   };
 

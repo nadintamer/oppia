@@ -94,12 +94,22 @@ THRESHOLD_TIME_BEFORE_ACCEPT_IN_MSECS = (
     THRESHOLD_DAYS_BEFORE_ACCEPT * 24 * 60 * 60 * 1000)
 
 # The default message to be shown when accepting stale suggestions.
-DEFAULT_SUGGESTION_ACCEPT_MESSAGE = ('Automatically accepting suggestion after'
-                                     ' %d days' % THRESHOLD_DAYS_BEFORE_ACCEPT)
+DEFAULT_SUGGESTION_ACCEPT_MESSAGE = (
+    'Automatically accepting suggestion after'
+    ' %d days' % THRESHOLD_DAYS_BEFORE_ACCEPT)
 
 # The message to be shown when rejecting a suggestion with a target ID of a
 # deleted skill.
 DELETED_SKILL_REJECT_MESSAGE = 'The associated skill no longer exists.'
+
+# The message to be shown when rejecting a translation suggestion that is
+# associated with an exploration that no longer corresponds to the story.
+# The story could have been deleted or the exploration could have been removed
+# from the story.
+INVALID_STORY_REJECT_TRANSLATION_SUGGESTIONS_MSG = (
+    'This text snippet has been removed from the story, and no longer needs '
+    'translation. Sorry about that!'
+)
 
 # The amount to increase the score of the author by after successfuly getting an
 # accepted suggestion.
@@ -113,7 +123,7 @@ ACTION_TYPE_REJECT = 'reject'
 class GeneralSuggestionModel(base_models.BaseModel):
     """Model to store suggestions made by Oppia users.
 
-    The ID of the suggestions are created is the same as the ID of the thread
+    The ID of the suggestions created is the same as the ID of the thread
     linked to the suggestion.
     """
 
@@ -149,10 +159,21 @@ class GeneralSuggestionModel(base_models.BaseModel):
         """General suggestion needs to be pseudonymized for the user."""
         return base_models.DELETION_POLICY.LOCALLY_PSEUDONYMIZE
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Model contains user data."""
-        return base_models.EXPORT_POLICY.CONTAINS_USER_DATA
+        return dict(super(cls, cls).get_export_policy(), **{
+            'suggestion_type': base_models.EXPORT_POLICY.EXPORTED,
+            'target_type': base_models.EXPORT_POLICY.EXPORTED,
+            'target_id': base_models.EXPORT_POLICY.EXPORTED,
+            'target_version_at_submission':
+                base_models.EXPORT_POLICY.EXPORTED,
+            'status': base_models.EXPORT_POLICY.EXPORTED,
+            'author_id': base_models.EXPORT_POLICY.EXPORTED,
+            'final_reviewer_id': base_models.EXPORT_POLICY.EXPORTED,
+            'change_cmd': base_models.EXPORT_POLICY.EXPORTED,
+            'score_category': base_models.EXPORT_POLICY.EXPORTED
+        })
 
     @classmethod
     def has_reference_to_user_id(cls, user_id):
@@ -192,15 +213,17 @@ class GeneralSuggestionModel(base_models.BaseModel):
                 suggestion.
 
         Raises:
-            Exception: There is already a suggestion with the given id.
+            Exception. There is already a suggestion with the given id.
         """
         instance_id = thread_id
 
         if cls.get_by_id(instance_id):
-            raise Exception('There is already a suggestion with the given'
-                            ' id: %s' % instance_id)
+            raise Exception(
+                'There is already a suggestion with the given'
+                ' id: %s' % instance_id)
 
-        cls(id=instance_id, suggestion_type=suggestion_type,
+        cls(
+            id=instance_id, suggestion_type=suggestion_type,
             target_type=target_type, target_id=target_id,
             target_version_at_submission=target_version_at_submission,
             status=status, author_id=author_id,
@@ -230,18 +253,48 @@ class GeneralSuggestionModel(base_models.BaseModel):
         return query.fetch(feconf.DEFAULT_QUERY_LIMIT)
 
     @classmethod
-    def get_all_stale_suggestions(cls):
-        """Gets all suggestions which were last updated before the threshold
-        time.
+    def get_translation_suggestion_ids_with_exp_ids(cls, exp_ids):
+        """Gets the ids of translation suggestions corresponding to
+        explorations with the given exploration ids.
+
+        Args:
+            exp_ids: list(str). List of exploration ids to query for.
 
         Returns:
-            list(SuggestionModel). A list of suggestions that are stale.
+            list(str). A list of translation suggestion ids that
+            correspond to the given exploration ids. Note: it is not
+            guaranteed that the suggestion ids returned are ordered by the
+            exploration ids in exp_ids.
+        """
+        query = (
+            cls.get_all()
+            .order(cls.key)
+            .filter(cls.suggestion_type == SUGGESTION_TYPE_TRANSLATE_CONTENT)
+            .filter(cls.target_id.IN(exp_ids))
+        )
+        suggestion_models = []
+        cursor, more = (None, True)
+        while more:
+            results, cursor, more = query.fetch_page(
+                feconf.DEFAULT_QUERY_LIMIT, start_cursor=cursor)
+            suggestion_models.extend(results)
+        return [suggestion_model.id for suggestion_model in suggestion_models]
+
+    @classmethod
+    def get_all_stale_suggestion_ids(cls):
+        """Gets the ids of the suggestions which were last updated before the
+        threshold time.
+
+        Returns:
+            list(str). A list of the ids of the suggestions that are stale.
         """
         threshold_time = (
             datetime.datetime.utcnow() - datetime.timedelta(
                 0, 0, 0, THRESHOLD_TIME_BEFORE_ACCEPT_IN_MSECS))
-        return cls.get_all().filter(cls.status == STATUS_IN_REVIEW).filter(
-            cls.last_updated < threshold_time).fetch()
+        suggestion_models = cls.get_all().filter(
+            cls.status == STATUS_IN_REVIEW).filter(
+                cls.last_updated < threshold_time).fetch()
+        return [suggestion_model.id for suggestion_model in suggestion_models]
 
     @classmethod
     def get_in_review_suggestions_in_score_categories(
@@ -250,7 +303,7 @@ class GeneralSuggestionModel(base_models.BaseModel):
         score_categories.
 
         Args:
-            score_categories: list(str). list of score categories to query for.
+            score_categories: list(str). List of score categories to query for.
             user_id: list(str). The id of the user trying to make this query.
                 As a user cannot review their own suggestions, suggestions
                 authored by the user will be excluded.
@@ -458,10 +511,20 @@ class GeneralVoiceoverApplicationModel(base_models.BaseModel):
             cls.target_type == target_type, cls.target_id == target_id,
             cls.language_code == language_code)).fetch()
 
-    @staticmethod
-    def get_export_policy():
+    @classmethod
+    def get_export_policy(cls):
         """Model contains user data."""
-        return base_models.EXPORT_POLICY.CONTAINS_USER_DATA
+        return dict(super(cls, cls).get_export_policy(), **{
+            'target_type': base_models.EXPORT_POLICY.EXPORTED,
+            'target_id': base_models.EXPORT_POLICY.EXPORTED,
+            'language_code': base_models.EXPORT_POLICY.EXPORTED,
+            'status': base_models.EXPORT_POLICY.EXPORTED,
+            'content': base_models.EXPORT_POLICY.EXPORTED,
+            'filename': base_models.EXPORT_POLICY.EXPORTED,
+            'author_id': base_models.EXPORT_POLICY.EXPORTED,
+            'final_reviewer_id': base_models.EXPORT_POLICY.EXPORTED,
+            'rejection_message': base_models.EXPORT_POLICY.EXPORTED
+        })
 
     @classmethod
     def export_data(cls, user_id):

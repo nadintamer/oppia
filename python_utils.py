@@ -30,16 +30,12 @@ sys.path.insert(0, _FUTURE_PATH)
 _YAML_PATH = os.path.join(os.getcwd(), '..', 'oppia_tools', 'pyyaml-5.1.2')
 sys.path.insert(0, _YAML_PATH)
 
-# pylint: disable=wrong-import-position
-# pylint: disable=wrong-import-order
-import yaml  # isort:skip
+import yaml  # isort:skip  pylint: disable=wrong-import-position, wrong-import-order
 
-import builtins  # isort:skip
-import future.utils  # isort:skip
-import past.builtins  # isort:skip
-import past.utils  # isort:skip
-# pylint: enable=wrong-import-order
-# pylint: enable=wrong-import-position
+import builtins  # isort:skip  pylint: disable=wrong-import-position, wrong-import-order
+import future.utils  # isort:skip  pylint: disable=wrong-import-position, wrong-import-order
+import past.builtins  # isort:skip  pylint: disable=wrong-import-position, wrong-import-order
+import past.utils  # isort:skip  pylint: disable=wrong-import-position, wrong-import-order
 
 
 BASESTRING = past.builtins.basestring
@@ -274,7 +270,7 @@ def url_encode(query, doseq=False):
     return urlparse_urlencode.urlencode(query, doseq)
 
 
-def url_retrieve(source_url, filename):
+def url_retrieve(source_url, filename=None):
     """Copy a network object denoted by a URL to a local file using
     urllib.urlretrieve if run under Python 2 and urllib.request.urlretrieve if
     run under Python 3.
@@ -288,6 +284,11 @@ def url_retrieve(source_url, filename):
     """
     try:
         import urllib
+        # Change the User-Agent to prevent servers from blocking requests.
+        # See https://support.cloudflare.com/hc/en-us/articles/360029779472-Troubleshooting-Cloudflare-1XXX-errors#error1010. # pylint: disable=line-too-long
+        urllib.URLopener.version = (
+            'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) '
+            'Gecko/20100101 Firefox/47.0')
         return urllib.urlretrieve(source_url, filename=filename)
     except ImportError:
         import urllib.request
@@ -377,7 +378,8 @@ def convert_to_bytes(string_to_convert):
     """Converts the string to bytes.
 
     Args:
-        string_to_convert: unicode|str.
+        string_to_convert: unicode|str. Required string to be converted into
+            bytes.
 
     Returns:
         bytes. The encoded string.

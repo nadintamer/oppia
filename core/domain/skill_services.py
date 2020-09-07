@@ -20,6 +20,7 @@ from __future__ import unicode_literals  # pylint: disable=import-only-modules
 import logging
 
 from constants import constants
+from core.domain import caching_services
 from core.domain import config_domain
 from core.domain import html_cleaner
 from core.domain import opportunity_services
@@ -28,7 +29,9 @@ from core.domain import skill_domain
 from core.domain import skill_fetchers
 from core.domain import state_domain
 from core.domain import suggestion_services
+from core.domain import topic_domain
 from core.domain import topic_fetchers
+from core.domain import topic_services
 from core.domain import user_services
 from core.platform import models
 import feconf
@@ -39,7 +42,6 @@ import python_utils
         models.NAMES.skill, models.NAMES.user, models.NAMES.question,
         models.NAMES.topic]))
 datastore_services = models.Registry.import_datastore_services()
-memcache_services = models.Registry.import_memcache_services()
 
 
 # Repository GET methods.
@@ -178,7 +180,7 @@ def _get_augmented_skill_summaries_in_batches(
                   for topic_model in all_topic_models]
 
     topic_classroom_dict = {}
-    all_classrooms_dict = config_domain.TOPIC_IDS_FOR_CLASSROOM_PAGES.value
+    all_classrooms_dict = config_domain.CLASSROOM_PAGES_DATA.value
 
     for classroom in all_classrooms_dict:
         for topic_id in classroom['topic_ids']:
@@ -378,10 +380,12 @@ def get_skill_summary_from_model(skill_summary_model):
     skill summary model.
 
     Args:
-        skill_summary_model: SkillSummaryModel.
+        skill_summary_model: SkillSummaryModel. The skill summary model object
+            to get corresponding domain object.
 
     Returns:
-        SkillSummary.
+        SkillSummary. The domain object corresponding to given skill summmary
+        model.
     """
     return skill_domain.SkillSummary(
         skill_summary_model.id, skill_summary_model.description,
@@ -405,6 +409,63 @@ def get_image_filenames_from_skill(skill):
     """
     html_list = skill.get_all_html_content_strings()
     return html_cleaner.get_image_filenames_from_html_strings(html_list)
+
+
+def get_all_topic_assignments_for_skill(skill_id):
+    """Returns a list containing all the topics to which the given skill is
+    assigned along with topic details.
+
+    Args:
+        skill_id: str. ID of the skill.
+
+    Returns:
+        list(TopicAssignment). A list of TopicAssignment domain objects.
+    """
+    topic_assignments = []
+    topics = topic_fetchers.get_all_topics()
+    for topic in topics:
+        if skill_id in topic.get_all_skill_ids():
+            subtopic_id = None
+            for subtopic in topic.subtopics:
+                if skill_id in subtopic.skill_ids:
+                    subtopic_id = subtopic.id
+                    break
+
+            topic_assignments.append(skill_domain.TopicAssignment(
+                topic.id, topic.name, topic.version, subtopic_id))
+
+    return topic_assignments
+
+
+def remove_skill_from_all_topics(user_id, skill_id):
+    """Deletes the skill with the given id from all the associated topics.
+
+    Args:
+        user_id: str. The unique user ID of the user.
+        skill_id: str. ID of the skill.
+    """
+    all_topics = topic_fetchers.get_all_topics()
+    for topic in all_topics:
+        change_list = []
+        if skill_id in topic.get_all_skill_ids():
+            for subtopic in topic.subtopics:
+                if skill_id in subtopic.skill_ids:
+                    change_list.append(topic_domain.TopicChange({
+                        'cmd': 'remove_skill_id_from_subtopic',
+                        'subtopic_id': subtopic.id,
+                        'skill_id': skill_id
+                    }))
+                    break
+
+            change_list.append(topic_domain.TopicChange({
+                'cmd': 'remove_uncategorized_skill_id',
+                'uncategorized_skill_id': skill_id
+            }))
+            skill_name = get_skill_summary_by_id(skill_id).description
+            topic_services.update_topic_and_subtopic_pages(
+                user_id, topic.id, change_list,
+                'Removed skill with id %s and name %s from the topic' % (
+                    skill_id, skill_name))
 
 
 def get_skill_summary_by_id(skill_id, strict=True):
@@ -475,8 +536,8 @@ def _create_skill(committer_id, skill, commit_message, commit_cmds):
     skill.version += 1
     create_skill_summary(skill.id)
     opportunity_services.create_skill_opportunity(
-        skill_id=skill.id,
-        skill_description=skill.description)
+        skill.id,
+        skill.description)
 
 
 def save_new_skill(committer_id, skill):
@@ -518,9 +579,10 @@ def apply_change_list(skill_id, change_list, committer_id):
                             'The user does not have enough rights to edit the '
                             'skill description.')
                     skill.update_description(change.new_value)
-                    (opportunity_services
-                     .update_skill_opportunity_skill_description(
-                         skill.id, change.new_value))
+                    (
+                        opportunity_services
+                        .update_skill_opportunity_skill_description(
+                            skill.id, change.new_value))
                 elif (change.property_name ==
                       skill_domain.SKILL_PROPERTY_LANGUAGE_CODE):
                     skill.update_language_code(change.new_value)
@@ -533,8 +595,10 @@ def apply_change_list(skill_id, change_list, committer_id):
             elif change.cmd == skill_domain.CMD_UPDATE_SKILL_CONTENTS_PROPERTY:
                 if (change.property_name ==
                         skill_domain.SKILL_CONTENTS_PROPERTY_EXPLANATION):
-                    skill.update_explanation(
+                    explanation = (
                         state_domain.SubtitledHtml.from_dict(change.new_value))
+                    explanation.validate()
+                    skill.update_explanation(explanation)
                 elif (change.property_name ==
                       skill_domain.SKILL_CONTENTS_PROPERTY_WORKED_EXAMPLES):
                     worked_examples_list = [
@@ -608,9 +672,9 @@ def _save_skill(committer_id, skill, commit_message, change_list):
         change_list: list(SkillChange). List of changes applied to a skill.
 
     Raises:
-        Exception: The skill model and the incoming skill domain object have
+        Exception. The skill model and the incoming skill domain object have
             different version numbers.
-        Exception: Received invalid change list.
+        Exception. Received invalid change list.
     """
     if not change_list:
         raise Exception(
@@ -655,7 +719,8 @@ def _save_skill(committer_id, skill, commit_message, change_list):
     skill_model.next_misconception_id = skill.next_misconception_id
     change_dicts = [change.to_dict() for change in change_list]
     skill_model.commit(committer_id, commit_message, change_dicts)
-    memcache_services.delete(skill_fetchers.get_skill_memcache_key(skill.id))
+    caching_services.delete_multi(
+        caching_services.CACHE_NAMESPACE_SKILL, None, [skill.id])
     skill.version += 1
 
 
@@ -673,7 +738,7 @@ def update_skill(committer_id, skill_id, change_list, commit_message):
             unpublished skills, it may be equal to None.
 
     Raises:
-        ValueError: No commit message was provided.
+        ValueError. No commit message was provided.
     """
     if not commit_message:
         raise ValueError(
@@ -703,14 +768,14 @@ def delete_skill(committer_id, skill_id, force_deletion=False):
 
     # This must come after the skill is retrieved. Otherwise the memcache
     # key will be reinstated.
-    skill_memcache_key = skill_fetchers.get_skill_memcache_key(skill_id)
-    memcache_services.delete(skill_memcache_key)
+    caching_services.delete_multi(
+        caching_services.CACHE_NAMESPACE_SKILL, None, [skill_id])
 
     # Delete the summary of the skill (regardless of whether
     # force_deletion is True or not).
     delete_skill_summary(skill_id)
     opportunity_services.delete_skill_opportunity(skill_id)
-    suggestion_services.reject_question_suggestions_with_skill_target_id(
+    suggestion_services.auto_reject_question_suggestions_for_skill_id(
         skill_id)
 
 
@@ -765,8 +830,8 @@ def save_skill_summary(skill_summary):
     entity in the datastore.
 
     Args:
-        skill_summary: The skill summary object to be saved in the
-            datastore.
+        skill_summary: SkillSummaryModel. The skill summary object to be saved
+            in the datastore.
     """
     skill_summary_dict = {
         'description': skill_summary.description,

@@ -17,11 +17,9 @@
  * upload.
  */
 
-var forms = require('../protractor_utils/forms.js');
 var general = require('../protractor_utils/general.js');
 var users = require('../protractor_utils/users.js');
 var workflow = require('../protractor_utils/workflow.js');
-var waitFor = require('../protractor_utils/waitFor.js');
 
 var ExplorationEditorPage =
   require('../protractor_utils/ExplorationEditorPage.js');
@@ -39,7 +37,7 @@ describe('rich-text components', function() {
     explorationPlayerPage = new ExplorationPlayerPage.ExplorationPlayerPage();
   });
 
-  it('should display math expressions correctly', async function() {
+  it('should display rte involving file upload correctly', async function() {
     await users.createUser(
       'richTextuser@fileUploadExtensions.com',
       'fileUploadRichTextuser');
@@ -52,6 +50,9 @@ describe('rich-text components', function() {
       await richTextEditor.appendPlainText('This is a math expression');
       // TODO(Jacob): Add test for image RTE component.
       await richTextEditor.addRteComponent('Math', 'x^2 + y^2');
+      await richTextEditor.addRteComponent(
+        'Svgdiagram', ['rectangle', 'bezier', 'piechart', 'svgupload'],
+        'An svg diagram.');
     });
 
     await explorationEditorPage.navigateToPreviewTab();
@@ -61,6 +62,9 @@ describe('rich-text components', function() {
         await richTextChecker.readBoldText('bold');
         await richTextChecker.readPlainText('This is a math expression');
         await richTextChecker.readRteComponent('Math', 'x^2 + y^2');
+        await richTextChecker.readRteComponent(
+          'Svgdiagram', ['rectangle', 'bezier', 'piechart', 'svgupload'],
+          'An svg diagram.');
       });
 
     await explorationEditorPage.discardChanges();
