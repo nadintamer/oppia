@@ -45,7 +45,7 @@ export interface EditableExplorationDataBackendDict {
   'init_state_name': string;
   'language_code': string;
   'objective': string;
-  'param_changes': IParamChangeBackendDict[];
+  'param_changes': ParamChangeBackendDict[];
   'param_specs': ParamSpecsBackendDict;
   'rights': any;
   'show_state_editor_tutorial_on_load': boolean;
@@ -116,6 +116,13 @@ export class EditableExplorationData {
     this.stateClassifierMapping = stateClassifierMapping;
   }
 
+  toBackendDict(): EditableExplorationDataBackendDict {
+    var paramSpecsBackendDict = {};
+    this.forEach((paramName, paramSpec) => {
+      paramSpecsBackendDict[paramName] = paramSpec.toBackendDict();
+    });
+    return paramSpecsBackendDict;
+  }
 }
 
 @Injectable({

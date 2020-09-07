@@ -22,9 +22,9 @@ import { HttpClient } from '@angular/common/http';
 
 import { AppConstants } from
   'app.constants';
-import { Exploration, ExplorationObjectFactory, IExplorationBackendDict } from
+import { Exploration, ExplorationObjectFactory, ExplorationBackendDict } from
   'domain/exploration/ExplorationObjectFactory';
-import { EditableExplorationDataObjectFactory, IEditableExplorationDataBackendDict } from
+import { EditableExplorationDataObjectFactory, EditableExplorationDataBackendDict } from
   'domain/exploration/EditableExplorationDataObjectFactory';
 import { ReadOnlyExplorationBackendApiService } from
   'domain/exploration/read-only-exploration-backend-api.service';
@@ -51,7 +51,7 @@ export class EditableExplorationBackendApiService {
     var editableExplorationDataUrl = this._getExplorationUrl(
       explorationId, applyDraft);
 
-    this.http.get<IEditableExplorationDataBackendDict>(
+    this.http.get<EditableExplorationDataBackendDict>(
     	editableExplorationDataUrl).toPromise().then(response => {
       var explorationDataDict = cloneDeep(response);
       var explorationDataObject = this.editableExplorationDataObjectFactory.

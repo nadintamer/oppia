@@ -25,21 +25,21 @@ import cloneDeep from 'lodash/cloneDeep';
 
 import { AppConstants } from
   'app.constants';
-import { Exploration, ExplorationObjectFactory, IExplorationBackendDict } from
+import { Exploration, ExplorationObjectFactory, ExplorationBackendDict } from
   'domain/exploration/ExplorationObjectFactory';
-import { IBackendStateClassifierMapping } from
+import { StateClassifierMappingBackendDict } from
   'pages/exploration-player-page/services/state-classifier-mapping.service.ts';
 import { UrlInterpolationService } from
   'domain/utilities/url-interpolation.service';
-import { IParamChangeBackendDict, ParamChange } from
+import { ParamChangeBackendDict, ParamChange } from
   'domain/exploration/ParamChangeObjectFactory';
 import { ParamChangesObjectFactory } from
   'domain/exploration/ParamChangesObjectFactory';
-import { IParamSpecsBackendDict, ParamSpecs, ParamSpecsObjectFactory } from
+import { ParamSpecsBackendDict, ParamSpecs, ParamSpecsObjectFactory } from
   'domain/exploration/ParamSpecsObjectFactory';
 import {
-  IStateObjectsBackendDict,
-  IVoiceoverObjectsDict,
+  StateObjectsBackendDict,
+  VoiceoverObjectsDict,
   States,
   StatesObjectFactory
 } from 'domain/exploration/StatesObjectFactory';
@@ -48,13 +48,13 @@ interface ReadOnlyExplorationDataBackendDict {
   'auto_tts_enabled': boolean;
   'can_edit': boolean;
   'correctness_feedback_enabled': boolean;
-  'exploration': IExplorationBackendDict;
+  'exploration': ExplorationBackendDict;
   'exploration_id': string;
   'is_logged_in': boolean;
   'session_id': string;
   'version': number;
   'preferred_audio_language_code': string;
-  'state_classifier_mapping': IBackendStateClassifierMapping,
+  'state_classifier_mapping': StateClassifierMappingBackendDict,
   'record_playthrough_probability': number;
 }
 
@@ -66,7 +66,7 @@ interface ReadOnlyExplorationData {
   sessionId: string;
   version: number;
   preferredAudioLanguageCode: string;
-  stateClassifierMapping: IBackendStateClassifierMapping;
+  stateClassifierMapping: StateClassifierMappingBackendDict;
   autoTtsEnabled: boolean;
   correctnessFeedbackEnabled: boolean;
   recordPlaythroughProbability: number;
