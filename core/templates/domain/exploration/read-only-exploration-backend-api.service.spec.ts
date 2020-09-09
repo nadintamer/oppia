@@ -24,6 +24,8 @@ import { CamelCaseToHyphensPipe } from
   'filters/string-utility-filters/camel-case-to-hyphens.pipe';
 import { ExplorationObjectFactory} from
   'domain/exploration/ExplorationObjectFactory';
+import { ReadOnlyExplorationDataObjectFactory, ReadOnlyExplorationDataBackendDict } from
+  'domain/exploration/ReadOnlyExplorationDataObjectFactory';
 import { ReadOnlyExplorationBackendApiService } from
   'domain/exploration/read-only-exploration-backend-api.service.ts';
 import { SubtitledHtmlObjectFactory } from
@@ -34,7 +36,26 @@ describe('Read only exploration backend API service', () => {
     ReadOnlyExplorationBackendApiService = null;
   let explorationObjectFactory: ExplorationObjectFactory = null;
   let subtitledHtmlObjectFactory: SubtitledHtmlObjectFactory = null;
+  let readOnlyExplorationDataObjectFactory:
+    ReadOnlyExplorationDataObjectFactory = null;
   let httpTestingController: HttpTestingController;
+
+  let explorationDict = {
+    id: 1,
+    title: 'My Title',
+    category: 'Art',
+    objective: 'Your objective',
+    tags: [],
+    blurb: '',
+    author_notes: '',
+    states_schema_version: 15,
+    init_state_name: 'Introduction',
+    language_code: 'en',
+    states: {},
+    param_specs: {},
+    param_changes: [],
+    version: 1
+  };
   let sampleDict = {
     exploration_id: '0',
     is_logged_in: true,
@@ -42,54 +63,9 @@ describe('Read only exploration backend API service', () => {
     correctness_feedback_enabled: false,
     can_edit: false,
     preferred_audio_language_code: '',
-    auto_tts_enabled: '',
+    auto_tts_enabled: false,
     record_playthrough_probability: 0,
-    exploration: {
-      init_state_name: 'Introduction',
-      param_changes: [],
-      param_specs: {},
-      title: '',
-      language_code: '',
-      states: {
-        Introduction: {
-          param_changes: [],
-          content: {
-            html: '',
-            audio_translations: {},
-            content_id: null
-          },
-          recorded_voiceovers: {
-            voiceovers_mapping: {}
-          },
-          written_translations: {
-            translations_mapping: {}
-          },
-          classifier_model_id: null,
-          solicit_answer_details: false,
-          unresolved_answers: {},
-          interaction: {
-            customization_args: {},
-            answer_groups: [],
-            default_outcome: {
-              param_changes: [],
-              dest: 'Introduction',
-              feedback: {
-                html: '',
-                audio_translations: {},
-                content_id: null
-              },
-              labelled_as_correct: null,
-              refresher_exploration_id: null,
-              missing_prerequisite_skill_id: null
-            },
-            hints: [],
-            confirmed_unclassified_answers: [],
-            id: null,
-            solution: null
-          }
-        }
-      }
-    },
+    exploration: explorationDict,
     version: 1,
     state_classifier_mapping: {}
   };
@@ -107,21 +83,11 @@ describe('Read only exploration backend API service', () => {
       ReadOnlyExplorationBackendApiService);
     httpTestingController = TestBed.get(HttpTestingController);
     explorationObjectFactory = TestBed.get(ExplorationObjectFactory);
+    readOnlyExplorationDataObjectFactory = TestBed.get(
+      ReadOnlyExplorationDataObjectFactory);
 
-    sampleData = {
-      canEdit: sampleDict.can_edit,
-      explorationId: sampleDict.exploration_id,
-      isLoggedIn: sampleDict.is_logged_in,
-      sessionId: sampleDict.session_id,
-      exploration: explorationObjectFactory.createFromBackendDict(
-        sampleDict.exploration),
-      version: sampleDict.version,
-      stateClassifierMapping: sampleDict.state_classifier_mapping,
-      preferredAudioLanguageCode: sampleDict.preferred_audio_language_code,
-      autoTtsEnabled: sampleDict.auto_tts_enabled,
-      correctnessFeedbackEnabled: sampleDict.correctness_feedback_enabled,
-      recordPlaythroughProbability: sampleDict.record_playthrough_probability,
-    };
+    sampleData = readOnlyExplorationDataObjectFactory.createFromBackendDict(
+      sampleDict);
   });
 
   afterEach(() => {

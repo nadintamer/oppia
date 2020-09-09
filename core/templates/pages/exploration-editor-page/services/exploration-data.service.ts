@@ -27,12 +27,12 @@ require('services/contextual/url.service.ts');
 require('services/services.constants.ajs.ts');
 
 angular.module('oppia').factory('ExplorationDataService', [
-  '$http', '$q', 'AlertsService',
+  '$http', '$q', '$rootScope', 'AlertsService',
   'EditableExplorationBackendApiService', 'LocalStorageService',
   'LoggerService', 'ReadOnlyExplorationBackendApiService',
   'UrlService', 'WindowRef',
   function(
-      $http, $q, AlertsService,
+      $http, $q, $rootScope, AlertsService,
       EditableExplorationBackendApiService, LocalStorageService,
       LoggerService, ReadOnlyExplorationBackendApiService,
       UrlService, WindowRef) {
@@ -141,7 +141,7 @@ angular.module('oppia').factory('ExplorationDataService', [
 
               // TODO(#8521): Remove the use of $rootScope.$apply()
               // once the controller is migrated to angular.
-              // $rootScope.$apply();
+              $rootScope.$apply();
 
               return response;
             })['catch'](function(error) {
@@ -160,7 +160,7 @@ angular.module('oppia').factory('ExplorationDataService', [
 
           // TODO(#8521): Remove the use of $rootScope.$apply()
           // once the controller is migrated to angular.
-          // $rootScope.$apply();
+          $rootScope.$apply();
 
           return response.exploration;
         });

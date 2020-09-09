@@ -23,7 +23,7 @@ import { HttpClientTestingModule, HttpTestingController } from
 import { EditableExplorationBackendApiService } from
   'domain/exploration/editable-exploration-backend-api.service';
 import { ReadOnlyExplorationBackendApiService } from
-  'domain/exploration/read-only-exploration-backend-api.service.ts';
+  'domain/exploration/read-only-exploration-backend-api.service';
 import { EditableExplorationDataObjectFactory } from
   'domain/exploration/EditableExplorationDataObjectFactory';
 
@@ -35,54 +35,58 @@ describe('Editable exploration backend API service', () => {
   let editableExplorationDataObjectFactory:
     EditableExplorationDataObjectFactory = null;
   let httpTestingController: HttpTestingController;
-  let sampleDict = {
-    exploration_id: '0',
+
+  let explorationDict = {
+    id: 1,
+    title: 'My Title',
+    category: 'Art',
+    objective: 'Your objective',
+    tags: [],
+    blurb: '',
+    author_notes: '',
+    states_schema_version: 15,
     init_state_name: 'Introduction',
     language_code: 'en',
+    states: {},
+    param_specs: {},
+    param_changes: [],
+    version: 1
+  };
+  let sampleReadOnlyDict = {
+    exploration_id: '0',
+    is_logged_in: true,
+    session_id: 'KERH',
+    correctness_feedback_enabled: false,
+    can_edit: false,
+    preferred_audio_language_code: '',
+    auto_tts_enabled: false,
+    record_playthrough_probability: 0,
+    exploration: explorationDict,
+    version: 1,
+    state_classifier_mapping: {}
+  };
+  let sampleDict = {
+    auto_tts_enabled: false,
+    category: '',
+    correctness_feedback_enabled: false,
+    draft_change_list_id: 0,
+    exploration_id: '0',
+    init_state_name: '',
+    language_code: '',
+    objective: '',
     param_changes: [],
     param_specs: {},
-    states: {
-      Introduction: {
-        param_changes: [],
-        content: {
-          html: '',
-          audio_translations: {},
-          content_id: null
-        },
-        recorded_voiceovers: {
-          voiceovers_mapping: {}
-        },
-        written_translations: {
-          translations_mapping: {}
-        },
-        classifier_model_id: null,
-        solicit_answer_details: false,
-        unresolved_answers: {},
-        interaction: {
-          customization_args: {},
-          answer_groups: [],
-          default_outcome: {
-            param_changes: [],
-            dest: 'Introduction',
-            feedback: {
-              html: '',
-              audio_translations: {},
-              content_id: null
-            },
-            labelled_as_correct: null,
-            refresher_exploration_id: null,
-            missing_prerequisite_skill_id: null
-          },
-          hints: [],
-          confirmed_unclassified_answers: [],
-          id: null,
-          solution: null
-        }
-      }
-    },
-    username: 'test',
-    user_email: 'test@example.com',
-    version: 1
+    rights: {},
+    show_state_editor_tutorial_on_load: false,
+    show_state_translation_tutorial_on_load: false,
+    states: {},
+    tags: [],
+    title: '',
+    version: 1,
+    is_version_of_draft_valid: true,
+    draft_changes: [],
+    email_preferences: {},
+    state_classifier_mapping: {}
   };
   let sampleData = null;
 
@@ -209,7 +213,7 @@ describe('Editable exploration backend API service', () => {
 
       var req = httpTestingController.expectOne('/explorehandler/init/0');
       expect(req.request.method).toEqual('GET');
-      req.flush(sampleDict);
+      req.flush(sampleReadOnlyDict);
 
       flushMicrotasks();
 

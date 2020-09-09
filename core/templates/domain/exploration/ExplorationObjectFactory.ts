@@ -219,6 +219,25 @@ export class Exploration {
   getAllVoiceoverLanguageCodes(): string[] {
     return this.states.getAllVoiceoverLanguageCodes();
   }
+
+  toBackendDict(): ExplorationBackendDict {
+    var stateBackendObjectsDict = {};
+    var stateObjectsDict = this.states.getStateObjects();
+    for (var stateName in stateObjectsDict) {
+      stateBackendObjectsDict[stateName] = stateObjectsDict[stateName].toBackendDict();
+    }
+
+    return {
+      init_state_name: this.initStateName,
+      param_changes: this.paramChanges.map((paramChange) => {
+        return paramChange.toBackendDict();
+      }),
+      param_specs: this.paramSpecs.toBackendDict(),
+      states: stateBackendObjectsDict,
+      title: this.title,
+      language_code: this.languageCode
+    };
+  }
 }
 
 @Injectable({

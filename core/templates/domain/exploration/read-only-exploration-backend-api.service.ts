@@ -25,6 +25,8 @@ import cloneDeep from 'lodash/cloneDeep';
 
 import { AppConstants } from
   'app.constants';
+import { ReadOnlyExplorationDataObjectFactory, ReadOnlyExplorationDataBackendDict } from
+  'domain/exploration/ReadOnlyExplorationDataObjectFactory';
 import { Exploration, ExplorationObjectFactory, ExplorationBackendDict } from
   'domain/exploration/ExplorationObjectFactory';
 import { StateClassifierMappingBackendDict } from
@@ -44,39 +46,12 @@ import {
   StatesObjectFactory
 } from 'domain/exploration/StatesObjectFactory';
 
-interface ReadOnlyExplorationDataBackendDict {
-  'auto_tts_enabled': boolean;
-  'can_edit': boolean;
-  'correctness_feedback_enabled': boolean;
-  'exploration': ExplorationBackendDict;
-  'exploration_id': string;
-  'is_logged_in': boolean;
-  'session_id': string;
-  'version': number;
-  'preferred_audio_language_code': string;
-  'state_classifier_mapping': StateClassifierMappingBackendDict,
-  'record_playthrough_probability': number;
-}
-
-interface ReadOnlyExplorationData {
-  canEdit: boolean;
-  exploration: Exploration;
-  explorationId: string;
-  isLoggedIn: boolean;
-  sessionId: string;
-  version: number;
-  preferredAudioLanguageCode: string;
-  stateClassifierMapping: StateClassifierMappingBackendDict;
-  autoTtsEnabled: boolean;
-  correctnessFeedbackEnabled: boolean;
-  recordPlaythroughProbability: number;
-}
-
 @Injectable({
   providedIn: 'root'
 })
 export class ReadOnlyExplorationBackendApiService {
   constructor(
+    private readOnlyExplorationDataObjectFactory: ReadOnlyExplorationDataObjectFactory,
     private explorationObjectFactory: ExplorationObjectFactory,
     private http: HttpClient,
     private urlInterpolation: UrlInterpolationService) {}
@@ -92,34 +67,13 @@ export class ReadOnlyExplorationBackendApiService {
     var explorationDataUrl = this._getExplorationUrl(explorationId, version);
 
     this.http.get<ReadOnlyExplorationDataBackendDict>(
-      explorationDataUrl).toPromise().then(response => {
-
-      var explorationData = {
-        init_state_name: response.exploration.init_state_name,
-        param_changes: response.exploration.param_changes,
-        param_specs: response.exploration.param_specs,
-        states: response.exploration.states,
-        title: response.exploration.title,
-        language_code: response.exploration.language_code
-      };
-      
-      var readOnlyExplorationData = {
-        canEdit: response.can_edit,
-        exploration: this.explorationObjectFactory.createFromBackendDict(
-          explorationData),
-        explorationId: response.exploration_id,
-        isLoggedIn: response.is_logged_in,
-        sessionId: response.session_id,
-        version: response.version,
-        preferredAudioLanguageCode: response.preferred_audio_language_code,
-        stateClassifierMapping: response.state_classifier_mapping,
-        autoTtsEnabled: response.auto_tts_enabled,
-        correctnessFeedbackEnabled: response.correctness_feedback_enabled,
-        recordPlaythroughProbability: response.record_playthrough_probability
-      };
+        explorationDataUrl).toPromise().then(response => {
+      var explorationDataDict = cloneDeep(response);
+      var explorationDataObject = this.readOnlyExplorationDataObjectFactory.
+      createFromBackendDict(response);
 
       if (successCallback) {
-        successCallback(readOnlyExplorationData);
+        successCallback(explorationDataObject);
       }
     }, errorResponse => {
       if (errorCallback) {

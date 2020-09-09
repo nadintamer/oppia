@@ -275,12 +275,11 @@ angular.module('oppia').factory('ExplorationEngineService', [
        *       first state.
        */
       init: function(
-          explorationDict, explorationVersion, preferredAudioLanguage,
+          explorationData, explorationVersion, preferredAudioLanguage,
           autoTtsEnabled, successCallback) {
         answerIsBeingProcessed = false;
         if (_editorPreviewMode) {
-          console.log("exploration dict");
-          console.log(explorationDict);
+          var explorationDict = explorationData.toBackendDict();
           exploration = ExplorationObjectFactory.createFromBackendDict(
             explorationDict);
           exploration.setInitialStateName(initStateName);
@@ -296,7 +295,7 @@ angular.module('oppia').factory('ExplorationEngineService', [
           _loadInitialState(successCallback);
         } else {
           exploration = ExplorationObjectFactory.createFromBackendDict(
-            explorationDict);
+            explorationData);
           visitedStateNames.push(exploration.getInitialState().name);
           version = explorationVersion;
           initParams([]);

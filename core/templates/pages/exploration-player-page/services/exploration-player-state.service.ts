@@ -45,7 +45,7 @@ require(
   'pages/exploration-player-page/exploration-player-page.constants.ajs.ts');
 
 angular.module('oppia').factory('ExplorationPlayerStateService', [
-  '$q', 'ContextService', 'EditableExplorationBackendApiService',
+  '$q', '$rootScope', 'ContextService', 'EditableExplorationBackendApiService',
   'ExplorationEngineService', 'ExplorationFeaturesBackendApiService',
   'ExplorationFeaturesService', 'NumberAttemptsService',
   'PlayerCorrectnessFeedbackEnabledService', 'PlayerTranscriptService',
@@ -55,7 +55,7 @@ angular.module('oppia').factory('ExplorationPlayerStateService', [
   'StatsReportingService', 'UrlService',
   'EXPLORATION_MODE',
   function(
-      $q, ContextService, EditableExplorationBackendApiService,
+      $q, $rootScope, ContextService, EditableExplorationBackendApiService,
       ExplorationEngineService, ExplorationFeaturesBackendApiService,
       ExplorationFeaturesService, NumberAttemptsService,
       PlayerCorrectnessFeedbackEnabledService, PlayerTranscriptService,
@@ -191,10 +191,12 @@ angular.module('oppia').factory('ExplorationPlayerStateService', [
         ExplorationFeaturesBackendApiService.fetchExplorationFeatures(
           explorationId),
       ]).then(function(combinedData) {
-        var explorationData = combinedData[0];
+        var readOnlyExplorationData = combinedData[0];
         var pretestQuestionsData = combinedData[1];
         var featuresData = combinedData[2];
-        ExplorationFeaturesService.init(explorationData, featuresData);
+        var explorationData = readOnlyExplorationData.toBackendDict();
+
+        ExplorationFeaturesService.init(explorationData.exploration, featuresData);
         if (pretestQuestionsData.length > 0) {
           setPretestMode();
           initializeExplorationServices(explorationData, true, callback);

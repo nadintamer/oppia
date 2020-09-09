@@ -457,6 +457,8 @@ import { ReadOnlyCollectionBackendApiService } from
   'domain/collection/read-only-collection-backend-api.service';
 import { ReadOnlyExplorationBackendApiService } from
   'domain/exploration/read-only-exploration-backend-api.service.ts';
+import { ReadOnlyExplorationDataObjectFactory } from
+  'domain/exploration/ReadOnlyExplorationDataObjectFactory';
 import { ReadOnlyStoryNodeObjectFactory } from
   'domain/story_viewer/ReadOnlyStoryNodeObjectFactory';
 import { ReadOnlySubtopicPageObjectFactory } from
@@ -1703,12 +1705,25 @@ export class UpgradedServices {
         upgradedServices['ParamSpecsObjectFactory'],
         upgradedServices['StatesObjectFactory']);
 
-    // Topological level: 9.
+    // Topological level: 11.
+    upgradedServices['ReadOnlyExplorationDataObjectFactory'] =
+      new ReadOnlyExplorationDataObjectFactory(
+        upgradedServices['ExplorationObjectFactory']);
+
     upgradedServices['ReadOnlyExplorationBackendApiService'] = 
       new ReadOnlyExplorationBackendApiService(
+        upgradedServices['ReadOnlyExplorationDataObjectFactory'],
         upgradedServices['ExplorationObjectFactory'],
         upgradedServices['UrlInterpolationService'],
         upgradedServices['HttpClient']);
+
+    // Topological level: 12.
+    upgradedServices['EditableExplorationBackendApiService'] = 
+      new EditableExplorationBackendApiService(
+        upgradedServices['EditableExplorationDataObjectFactory'],
+        upgradedServices['HttpClient'],
+        upgradedServices['ReadOnlyExplorationBackendApiService'],
+        upgradedServices['UrlInterpolationService']);
 
     /* eslint-enable dot-notation */
     return upgradedServices;

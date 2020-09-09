@@ -117,11 +117,37 @@ export class EditableExplorationData {
   }
 
   toBackendDict(): EditableExplorationDataBackendDict {
-    var paramSpecsBackendDict = {};
-    this.forEach((paramName, paramSpec) => {
-      paramSpecsBackendDict[paramName] = paramSpec.toBackendDict();
-    });
-    return paramSpecsBackendDict;
+    var stateBackendObjectsDict = {};
+    var stateObjectsDict = this.states.getStateObjects();
+    for (var stateName in stateObjectsDict) {
+      stateBackendObjectsDict[stateName] = stateObjectsDict[stateName].toBackendDict();
+    }
+
+    return {
+      auto_tts_enabled: this.autoTtsEnabled,
+      category: this.category,
+      correctness_feedback_enabled: this.correctnessFeedbackEnabled,
+      draft_change_list_id: this.draftChangeListId,
+      exploration_id: this.explorationId,
+      init_state_name: this.initStateName,
+      language_code: this.languageCode,
+      objective: this.objective,
+      param_changes: this.paramChanges.map((paramChange) => {
+        return paramChange.toBackendDict();
+      }),
+      param_specs: this.paramSpecs.toBackendDict(),
+      rights: this.rights,
+      show_state_editor_tutorial_on_load: this.showStateEditorTutorialOnLoad,
+      show_state_translation_tutorial_on_load: this.showStateTranslationTutorialOnLoad,
+      states: stateBackendObjectsDict,
+      tags: this.tags,
+      title: this.title,
+      version: this.version,
+      is_version_of_draft_valid: this.isVersionOfDraftValid,
+      draft_changes: this.draftChanges,
+      email_preferences: this.emailPreferences,
+      state_classifier_mapping: this.stateClassifierMapping
+    };
   }
 }
 

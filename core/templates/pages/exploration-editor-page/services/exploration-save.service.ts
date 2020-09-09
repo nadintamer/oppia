@@ -354,8 +354,7 @@ angular.module('oppia').factory('ExplorationSaveService', [
         }
 
         ExplorationDataService.getLastSavedData().then(function(data) {
-          var oldStates = StatesObjectFactory.createFromBackendDict(
-            data.states).getStateObjects();
+          var oldStates = data.states.getStateObjects();
           var newStates = ExplorationStatesService.getStates()
             .getStateObjects();
           var diffGraphData = ExplorationDiffService.getDiffGraphData(
